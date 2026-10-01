@@ -1,32 +1,62 @@
 # io_import.py
-import csv
-import numpy as np
 import pandas as pd
+import numpy as np
+import io
 
-def load_datacart_csv(path):
-    with open(path, newline="", encoding="utf-8-sig", errors="replace") as file:
-        rows = list(csv.reader(file))
+def parse_thermal_csv(filepath):
+    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+        lines = f.readlines()
 
-    marker_idx = next(
-        i for i, row in enumerate(rows)
-        if row and row[0].startswith("DATA::")
-    )
-    n_header_rows = int(rows[marker_idx][0].split("::")[1])
+    # parse metadata block
+    metadata = {}
+    data_marker_idx = 0
+    for i, line in enumerate(lines):
+        if line.startswith("DATA::"):
+            data_marker_idx = i
+            n_header_rows = int(line.strip().split("::")[1])
+            break
+        if ":" in line:
+            key, _, rest = line.partition(":")
+            metadata[key.strip()] = rest.strip().strip(",").strip('"')
 
-    metadata = [
-        {"key": row[0].rstrip(":"), "values": row[1:]}
-        for row in rows[:marker_idx]
-        if row
+    # parse the 5-row header block
+    header_start = data_marker_idx + 1
+    header_rows = [
+        [c.strip().strip('"') for c in lines[header_start + i].strip().split(",")]
+        for i in range(n_header_rows)
     ]
-    metadata_df = pd.DataFrame(metadata)
+    channel_ids, labels, units, scale, offset = header_rows
 
-    channel_names = rows[marker_idx + 2]
-    data_start = marker_idx + n_header_rows + 1
-    data_df = pd.DataFrame([row[:len(channel_names)] for row in rows[data_start:]], columns=channel_names)
-    # data_df = data_df.loc[:, ~(data_df.iloc[0] == -9.9e37)]  # drop open-TC columns
+    # parse the data rows
+    data_start = header_start + n_header_rows
+    data_text = "".join(lines[data_start:])
 
-    return metadata_df, data_df
+    n_named_cols = len(labels)  # 27, including "Timestamp"
+    df = pd.read_csv(
+        io.StringIO(data_text),
+        header=None,
+        usecols=range(n_named_cols),   # drop the trailing empty column
+        names=labels,
+        na_values=["", " "],
+    )
 
-path = "7272_RAW-DATA___008_27JAN20261051_T25013475_001.csv"
-df = load_datacart_csv(path)[1]
-print(df)
+    # clean up timestamp & numeric columns 
+    df["Timestamp"] = pd.to_datetime(
+        df["Timestamp"].str.strip(), format="%d/%b/%Y %H:%M:%S" # use fixed C-level parser for speed
+    )
+    for col in df.columns[1:]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Replace logger's "no sensor" sentinel with NaN
+    df.replace(-9.9e37, np.nan, inplace=True)
+
+    return metadata, {"units": units, "scale": scale, "offset": offset}, df
+
+
+metadata, channel_info, df = parse_thermal_csv(
+    "data/7272_RAW-DATA___008_27JAN20261051_T25013475_001.csv"
+)
+
+# print(metadata["MODEL"], metadata["TEST_TITLE"])
+# print(df.head())
+# print(df.dtypes)
