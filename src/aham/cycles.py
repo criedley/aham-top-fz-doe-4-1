@@ -1,5 +1,5 @@
 # cycles.py
-from models import CycleData, CycleBoundaries
+from .models import CycleData, CycleBoundaries
 
 # def find_boundaries_from_events() -> CycleBoundaries: return
 
