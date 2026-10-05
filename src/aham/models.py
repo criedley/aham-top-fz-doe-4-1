@@ -1,5 +1,6 @@
 # models.py
 from dataclasses import dataclass
+from datetime import datetime
 import pandas as pd
 
 @dataclass
@@ -32,16 +33,38 @@ class ChannelConfig:
     watt_hours_col: str
 
 @dataclass
-class CycleBoundaries:
-    time_on: list[pd.Timestamp]      # TimeCycleOn()
-    time_off: list[pd.Timestamp]     # TimeCycleOff()
-    index_on: list[int]              # IndexCycleOn()
-    index_off: list[int]             # IndexCycleOff()
-    watt_hours_at_on: list[float]    # WattHoursCount()
-    cyclic: bool                     # cyclic flag
-    last_scan_index: int             # LastScanIndex
-    last_scan_time: pd.Timestamp     # LastScan
+class TestConfig:
+    # --- Cabinet / technician-entered physical parameters ---
+    height_in: float              # hght, raw technician input (cabinet height, inches)
+    height_adjusted_in: float     # hght + 10" t/c offset adjustment, computed not entered
+    ct: float                     # CT, compressor "cycles per test" or similar AHAM param
+    ff_ct: float = 0.0            # FFCT, legacy fresh-food CT (unused post-v1.6 per VBA comment)
 
+    # --- Freezer-only test handling ---
+    fz_only: bool = False
+    fz_only_kfactor: float = 1.0  # must be one of {1, 0.85, 0.7} per original dropdown validation
+
+    # --- Test start adjustment ---
+    adjusted_start: bool = False
+    time_to_start: datetime | None = None   # only meaningful if adjusted_start=True
+
+    # --- Stability-check constants (AHAM standard, not technician-editable) ---
+    stability_window_rows: int = 120        # the 119-row averaging window in StabilityCheck
+    stability_delta_rows: int = 300         # Delta: row offset between window A and window B
+    stability_rate_per_hour: float = 0.042  # degF/hr drift allowed, used in both StabilityCheck and Run100
+
+    # --- Diagnostics / behavior flags ---
+    debug_mode: bool = False
+
+    def gradient_limit(self) -> float:
+        """Equivalent to GradientLimit = 0.5 * hght / 12 (feet)."""
+        return 0.5 * self.height_adjusted_in / 12
+
+    def stability_threshold(self, delta_rows: int | None = None) -> float:
+        """Equivalent to Difference = (Delta / 60) * 0.042 in StabilityCheck."""
+        delta = delta_rows if delta_rows is not None else self.stability_delta_rows
+        return (delta / 60) * self.stability_rate_per_hour
+    
 @dataclass
 class CycleData:
     cycles: pd.DataFrame
