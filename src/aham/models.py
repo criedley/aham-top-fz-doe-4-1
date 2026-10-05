@@ -56,6 +56,17 @@ class TestConfig:
     # --- Diagnostics / behavior flags ---
     debug_mode: bool = False
 
+    def __post_init__(self):
+        # only three K-factors are valid, per AHAM spec for different freezer-only configurations
+        if self.fz_only and self.fz_only_kfactor not in (1.0, 0.85, 0.7):
+            raise ValueError(
+                f"fz_only_kfactor must be 1, 0.85, or 0.7 (per AHAM spec), got {self.fz_only_kfactor}"
+            )
+        if self.ct <= 0:
+            raise ValueError("CT value must be entered and greater than zero")  # replaces CheckUserInput
+        if self.adjusted_start and self.time_to_start is None:
+            raise ValueError("adjusted_start=True requires time_to_start to be set")
+
     def gradient_limit(self) -> float:
         """Equivalent to GradientLimit = 0.5 * hght / 12 (feet)."""
         return 0.5 * self.height_adjusted_in / 12
