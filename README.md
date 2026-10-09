@@ -42,10 +42,8 @@ report.**
    extracted, open-thermocouple readings are dropped, Unit On / Defrost
    events are identified, and column names are normalized against known
    aliases.
-3. The technician assigns each logical sensor role (Watts, FF BW 1,
-   RSOC HI, cabinet height, CT value, etc.) to an actual column in the
-   uploaded file, via dropdowns populated from the real file contents.
-4. Submitting the form validates the assignment (every required role is
+3. The technician inputs required data where needed via dropdowns.
+4. Submitting the form validates the assignment (every required channel is
    present, every assigned column actually exists, K-factor and CT are
    within valid ranges) and saves it as a configuration file —
    **it does not run the analysis itself.**
