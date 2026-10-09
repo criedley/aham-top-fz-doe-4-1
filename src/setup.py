@@ -1,5 +1,5 @@
 """
-src/aham/setup.py
+src/setup.py
 
 Python equivalent of Setup.bas's SetupVars/AvailChannel/RowCol.
 Resolves technician-assigned channel roles (Watts, FF BW 1, RSOC HI, etc.)
@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import yaml
 import logging
+from pathlib import Path
 
 from models import ImportResult, ChannelConfig
 
@@ -34,21 +35,25 @@ OPTIONAL_ROLES = ["FZ BW 4", "FZ BW 5", "ICE BW", "Volts"]
 
 def build_channel_config(import_result: ImportResult,
                           technician_channel_map: dict[str, str]) -> ChannelConfig:
-    """
-    Resolves logical channel roles to column names, equivalent to
-    SetupVars' VLOOKUP-against-"tcs" logic, with AvailChannel's header
-    scan replaced by import_result.raw_df.columns directly.
-    """
     available = set(import_result.raw_df.columns)
 
     _check_minimum_scans(import_result.raw_df)
     _check_complete_assignment(technician_channel_map)
 
-    def resolve(role: str, required: bool = True) -> str | None:
+    def resolve_required(role: str) -> str:
         assigned = technician_channel_map.get(role)
         if assigned is None or assigned == "NA":
-            if required:
-                raise ValueError(f"Required channel role '{role}' was not assigned")
+            raise ValueError(f"Required channel role '{role}' was not assigned")
+        if assigned not in available:
+            raise ValueError(
+                f"Channel '{assigned}' assigned to role '{role}' not found in raw data. "
+                f"Available columns: {sorted(available)}"
+            )
+        return assigned
+
+    def resolve_optional(role: str) -> str | None:
+        assigned = technician_channel_map.get(role)
+        if assigned is None or assigned == "NA":
             return None
         if assigned not in available:
             raise ValueError(
@@ -58,26 +63,26 @@ def build_channel_config(import_result: ImportResult,
         return assigned
 
     return ChannelConfig(
-        watts_col=resolve("Watts"),
-        watt_hours_col=resolve("Watt-Hours"),
-        unit_on_col=resolve("Unit On"),
-        defrost_on_col=resolve("Defrost On"),
-        rsoc_col=resolve("RSOC Mid"),
-        lsoc_col=resolve("LSOC Mid"),
-        rsoc_hi_col=resolve("RSOC HI"),
-        rsoc_lo_col=resolve("RSOC LO"),
-        lsoc_hi_col=resolve("LSOC HI"),
-        lsoc_lo_col=resolve("LSOC LO"),
-        ff_bw1_col=resolve("FF BW 1"),
-        ff_bw2_col=resolve("FF BW 2"),
-        ff_bw3_col=resolve("FF BW 3"),
-        fz_bw1_col=resolve("FZ BW 1"),
-        fz_bw2_col=resolve("FZ BW 2"),
-        fz_bw3_col=resolve("FZ BW 3"),
-        fz_bw4_col=resolve("FZ BW 4", required=False),
-        fz_bw5_col=resolve("FZ BW 5", required=False),
-        ice_bw_col=resolve("ICE BW", required=False),
-        volts_col=resolve("Volts", required=False),
+        watts_col=resolve_required("Watts"),
+        watt_hours_col=resolve_required("Watt-Hours"),
+        unit_on_col=resolve_required("Unit On"),
+        defrost_on_col=resolve_required("Defrost On"),
+        rsoc_col=resolve_required("RSOC Mid"),
+        lsoc_col=resolve_required("LSOC Mid"),
+        rsoc_hi_col=resolve_required("RSOC HI"),
+        rsoc_lo_col=resolve_required("RSOC LO"),
+        lsoc_hi_col=resolve_required("LSOC HI"),
+        lsoc_lo_col=resolve_required("LSOC LO"),
+        ff_bw1_col=resolve_required("FF BW 1"),
+        ff_bw2_col=resolve_required("FF BW 2"),
+        ff_bw3_col=resolve_required("FF BW 3"),
+        fz_bw1_col=resolve_required("FZ BW 1"),
+        fz_bw2_col=resolve_required("FZ BW 2"),
+        fz_bw3_col=resolve_required("FZ BW 3"),
+        fz_bw4_col=resolve_optional("FZ BW 4"),
+        fz_bw5_col=resolve_optional("FZ BW 5"),
+        ice_bw_col=resolve_optional("ICE BW"),
+        volts_col=resolve_optional("Volts"),
     )
 
 

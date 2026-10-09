@@ -21,6 +21,8 @@ class ChannelConfig:
     fz_bw3_col: str
     fz_bw4_col: str | None
     fz_bw5_col: str | None
+    ice_bw_col: str | None
+    volts_col: str | None 
     rsoc_col: str
     lsoc_col: str
     rsoc_hi_col: str
