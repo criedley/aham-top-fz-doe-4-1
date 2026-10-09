@@ -68,7 +68,51 @@ nothing to `pip install`, just a set of scripts run with `uv run`.
 
 ## Setup
 
+### 1. Install uv
+
+If you don't already have `uv` installed:
+
+**macOS / Linux (including WSL):**
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+**Windows (PowerShell):**
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Or via a package manager, if you prefer:
+```bash
+# macOS (Homebrew)
+brew install uv
+
+# pipx
+pipx install uv
+```
+
+Verify it installed correctly:
+```bash
+uv --version
+```
+
+See the [official uv installation docs](https://docs.astral.sh/uv/getting-started/installation/) for other options.
+
+### 2. Clone and sync the project
+
 ```bash
 git clone <repo-url>
 cd aham-top-fz-doe-4-1
 uv sync
+```
+
+This creates `.venv` and installs everything listed in
+`pyproject.toml` / `uv.lock`. `uv` also manages the correct Python
+version automatically based on [`.python-version`](./.python-version)
+— you don't need to separately install or manage Python versions
+yourself.
+
+> **Note:** if you see a warning about `VIRTUAL_ENV` not matching the
+> project environment, either run `deactivate` first and let `uv`
+> manage the environment itself, or pass `--active` to the `uv` command
+> to use your currently-activated environment instead.
