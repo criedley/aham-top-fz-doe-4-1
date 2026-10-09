@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AHAM Test Setup</title>
+</head>
+<body>
+    <h1>Technician Input — Channel Assignment</h1>
+    <form action="/submit" method="post">
+
+        <h2>Required Channels</h2>
+        {% for role in required_roles %}
+        <div>
+            <label for="{{ role }}">{{ role }}</label>
+            <select name="{{ role }}" id="{{ role }}" required>
+                <option value="" disabled selected>-- select channel --</option>
+                {% for col in columns %}
+                <option value="{{ col }}">{{ col }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endfor %}
+
+        <h2>Optional Channels</h2>
+        {% for role in optional_roles %}
+        <div>
+            <label for="{{ role }}">{{ role }}</label>
+            <select name="{{ role }}" id="{{ role }}">
+                <option value="NA" selected>NA</option>
+                {% for col in columns %}
+                <option value="{{ col }}">{{ col }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endfor %}
+
+        <h2>Test Parameters</h2>
+        <div>
+            <label for="height_in">Cabinet Height (inches)</label>
+            <input type="number" step="0.1" name="height_in" id="height_in" required>
+        </div>
+        <div>
+            <label for="ct">CT Value</label>
+            <input type="number" step="0.1" name="ct" id="ct" required>
+        </div>
+        <div>
+            <label><input type="checkbox" name="fz_only" id="fz_only"> Freezer Only</label>
+        </div>
+        <div>
+            <label for="fz_only_kfactor">K-Factor (if Freezer Only)</label>
+            <select name="fz_only_kfactor" id="fz_only_kfactor">
+                <option value="1">1</option>
+                <option value="0.85">0.85</option>
+                <option value="0.7">0.7</option>
+            </select>
+        </div>
+        <div>
+            <label><input type="checkbox" name="adjusted_start" id="adjusted_start"> Adjust Start Time</label>
+            <input type="datetime-local" name="time_to_start" id="time_to_start">
+        </div>
+
+        <button type="submit">Save Configuration</button>
+    </form>
+</body>
+</html>
