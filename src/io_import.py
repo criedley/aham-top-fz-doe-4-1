@@ -10,6 +10,7 @@ ImportResult object for the rest of the pipeline to consume.
 from __future__ import annotations
 
 import logging
+import io
 from pathlib import Path
 
 import pandas as pd
@@ -35,19 +36,8 @@ REQUIRED_COLUMNS = [
 
 def load_datacart_csv(path: str | Path, alias_map: dict[str, list[str]],
                        on_missing_event_row: str = "approximate") -> ImportResult:
-    """
-    Main entry point. Equivalent to Module1.bas's ImportData sub.
+    metadata, header_rows, raw_df = _read_raw_csv(path)
 
-    on_missing_event_row: "approximate" (log + keep going) or "raise"
-        (fail loudly). There is intentionally no "insert synthetic row"
-        option here -- event extraction is diff-based, so fabricating rows
-        is unnecessary (see project notes on the original VBA's row-insert
-        workaround).
-    """
-    header_rows, data_start, raw = _read_raw_csv(path)
-    test_info = _parse_test_info(raw, header_rows)
-
-    raw_df = raw.iloc[data_start:].reset_index(drop=True)
     raw_df = _drop_leading_event_only_rows(raw_df, max_rows=5)
     raw_df = _drop_open_thermocouple_columns(raw_df)
     raw_df = _coerce_numeric(raw_df)
@@ -66,48 +56,63 @@ def load_datacart_csv(path: str | Path, alias_map: dict[str, list[str]],
     return ImportResult(
         raw_df=raw_df,
         events_df=events_df,
-        test_info=test_info,
+        test_info=metadata,
         watts_col="Watts",
-        column_map={c: c for c in raw_df.columns},  # already normalized
+        column_map={c: c for c in raw_df.columns},
     )
 
 # ---------------------------------------------------------------------------
 # CSV structure parsing (replaces the "DATA::" marker scan)
 # ---------------------------------------------------------------------------
 
-def _read_raw_csv(path: str | Path) -> tuple[int, int, pd.DataFrame]:
+def _read_raw_csv(path: str | Path) -> tuple[dict, int, pd.DataFrame]:
     """
-    Finds the 'DATA::<n>' marker row, matching ImportData's:
-        strtmp = Left(Cells(isel, 1).Value, 6)
-        If StrComp(strtmp, "DATA::") = 0 Then tsel = True
-    Returns (header_rows, data_start_row_index, raw_dataframe).
+    Two-phase parse. The metadata block above 'DATA::n' has a ragged
+    (inconsistent) number of fields per line and cannot be loaded with
+    pd.read_csv directly -- only the uniform data block below the header
+    rows is loaded that way.
     """
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        lines = f.readlines()
 
-    raw = pd.read_csv(path, header=None, dtype=str)
+    metadata: dict[str, str] = {}
+    marker_idx = None
+    header_rows = 0
 
-    marker_rows = raw[raw[0].astype(str).str.startswith("DATA::", na=False)]
-    if marker_rows.empty or marker_rows.index[0] > MAX_HEADER_SCAN_ROWS:
+    for i, line in enumerate(lines):
+        if line.startswith("DATA::"):
+            marker_idx = i
+            header_rows = int(line.strip().split("::")[1])
+            break
+        if ":" in line:
+            key, _, rest = line.partition(":")
+            metadata[key.strip()] = rest.strip().strip(",").strip('"')
+
+    if marker_idx is None or marker_idx > MAX_HEADER_SCAN_ROWS:
         raise ImportError(
             "Data format is invalid: 'DATA::' marker not detected or header corrupted"
         )
-    marker_idx = marker_rows.index[0]
-    header_rows = int(str(raw.iloc[marker_idx, 0]).split("::")[1])
 
-    header_row_idx = marker_idx + 1
-    raw.columns = raw.iloc[header_row_idx]
-    data_start = header_row_idx + 1
+    header_start = marker_idx + 1
+    header_block = [
+        [c.strip().strip('"') for c in lines[header_start + i].strip().split(",")]
+        for i in range(header_rows)
+    ]
+    labels = header_block[1] if len(header_block) > 1 else header_block[0]
+    n_named_cols = len(labels)
 
-    return header_rows, data_start, raw
+    data_start = header_start + header_rows
+    data_text = "".join(lines[data_start:])
 
-def _parse_test_info(raw: pd.DataFrame, header_rows: int) -> dict:
-    """Equivalent of copying rows 1..isel-1 into the 'Test Info' sheet."""
-
-    info_block = raw.iloc[:header_rows]
-    return {
-        str(row[0]): row[1] if len(row) > 1 else None
-        for row in info_block.itertuples(index=False, name=None)
-        if row and row[0]
-    }
+    raw = pd.read_csv(
+        io.StringIO(data_text),
+        header=None,
+        usecols=range(n_named_cols),   # drop the trailing empty column
+        names=labels,
+        na_values=["", " "],
+        dtype=str,
+    )
+    return metadata, header_rows, raw
 
 # ---------------------------------------------------------------------------
 # Cleanup steps
