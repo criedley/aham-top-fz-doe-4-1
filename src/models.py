@@ -85,3 +85,26 @@ class CycleData:
     cyclic: bool
     last_scan_index: int
     last_scan_time: pd.Timestamp
+
+@dataclass
+class GradientResult:
+    rs_grad: float
+    ls_grad: float
+
+@dataclass
+class AmbientResult:
+    rsoc_min: float
+    rsoc_max: float
+    lsoc_min: float
+    lsoc_max: float
+
+@dataclass
+class StabilityResult:
+    is_stable: bool
+    stable_cycle: int | None        # stabcycle
+    start_t1_index: int | None      # StartT1 / J
+    end_t1_index: int | None        # EndT1 / stabcycle
+    t1_minutes: float | None        # t1
+    ep1: float | None               # EP1, computed here since it's derived from the same window search
+    test_duration_min: float | None # TestDuration
+    reason: str | None = None       # replaces the MsgBox failure messages
