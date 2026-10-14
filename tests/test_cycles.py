@@ -9,13 +9,21 @@ from models import ChannelConfig, TestConfig
 
 def make_stats_raw_df(n_rows: int = 300) -> pd.DataFrame:
     """
-    FF BW 1 varies by cycle (38.0 / 40.0 / 42.0 across three 100-row
-    blocks) specifically so per-cycle averaging can be distinguished from
-    a global average. Every other channel is constant, so its expected
-    average is just that constant, computable without any arithmetic.
+    FF BW 1 varies across three roughly-equal blocks (for n_rows=300, this
+    is 100/100/100, matching make_three_cycle_boundaries' cycle layout).
+    For other n_rows values, the three-block pattern still fills the full
+    length -- the exact block sizes only matter for tests that correlate
+    this with a specific CycleBoundaries fixture.
     """
     timestamps = pd.date_range("2026-01-27 00:00:00", periods=n_rows, freq="min")
-    ff_bw1 = [38.0] * 100 + [40.0] * 100 + [42.0] * 100
+
+    block = max(1, n_rows // 3)
+    ff_bw1 = [38.0] * block + [40.0] * block + [42.0] * block
+    if len(ff_bw1) < n_rows:
+        ff_bw1 += [42.0] * (n_rows - len(ff_bw1))   # pad any remainder
+    else:
+        ff_bw1 = ff_bw1[:n_rows]                      # trim if block*3 overshot
+
     return pd.DataFrame({
         "Timestamp": timestamps,
         "FF BW 1": ff_bw1,
@@ -183,19 +191,19 @@ def test_last_cycle_duty_cycle_uses_last_scan_time(channel_config, test_config):
 
 def test_duty_cycle_is_nan_when_total_window_is_not_positive(channel_config, test_config):
     """
-    Edge case: if a cycle's 'on' time and the next cycle's 'on' time are
-    less than a minute apart, total_min <= 0 and the formula should not
-    raise a ZeroDivisionError -- it should produce NaN (our deliberate
-    deviation from the VBA, which did not guard against this at all).
+    Edge case: cycle 0 and cycle 1 have identical time_on values (zero
+    elapsed time between them), so total_min <= 0. Row ranges are still
+    valid/non-overlapping so only the duty-cycle math is being exercised,
+    not a degenerate window.
     """
     raw_df = make_stats_raw_df(n_rows=10)
     ts = raw_df["Timestamp"]
     boundaries = CycleBoundaries(
-        time_on=[ts.iloc[0], ts.iloc[0]],     # zero gap between cycles -> total_min <= 0
-        time_off=[ts.iloc[1], ts.iloc[2]],
-        index_on=[0, 0],
-        index_off=[1, 2],
-        watt_hours_at_on=[0, 0],
+        time_on=[ts.iloc[0], ts.iloc[0], ts.iloc[5]],   # cycle 0 and 1 share a timestamp
+        time_off=[ts.iloc[1], ts.iloc[3], ts.iloc[8]],
+        index_on=[0, 3, 5],
+        index_off=[1, 4, 8],
+        watt_hours_at_on=[0, 3, 5],
         cyclic=True,
         last_scan_index=9,
         last_scan_time=ts.iloc[9],
