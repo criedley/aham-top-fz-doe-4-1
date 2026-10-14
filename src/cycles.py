@@ -78,8 +78,13 @@ def _find_boundaries_from_events(events_df: pd.DataFrame, raw_df: pd.DataFrame,
         unit_on = events_df[config.unit_on_col]
         timestamps = events_df["Timestamp"]
 
-    on_rows = events_df[unit_on == 1]
-    off_rows = events_df[unit_on == 0]
+    # Only treat a row as an on/off boundary if Unit On ITSELF changed on
+    # that row -- not merely if its current value happens to be 1/0.
+    # events_df can contain rows triggered by Defrost/Comp changes where
+    # Unit On's value is just carried over from the previous state.
+    unit_on_changed = unit_on.diff().fillna(unit_on.iloc[0] if len(unit_on) else 0) != 0
+    on_rows = events_df[unit_on_changed & (unit_on == 1)]
+    off_rows = events_df[unit_on_changed & (unit_on == 0)]
 
     time_on, time_off, wh_at_on = [], [], []
     off_positions = off_rows.index.to_numpy()
@@ -281,5 +286,4 @@ def _compute_cycle_stats(raw_df: pd.DataFrame, boundaries: CycleBoundaries,
             "lsoc_hi_avg": lsoc_hi_avg, "lsoc_lo_avg": lsoc_lo_avg,
             "r_grad": r_grad, "l_grad": l_grad,
         })
-
     return pd.DataFrame.from_records(records)
