@@ -3,9 +3,91 @@ import math
 import pytest
 import pandas as pd
 
-from cycles import _compute_cycle_stats, CycleBoundaries
+from cycles import CycleBoundaries, _compute_cycle_stats, _find_boundaries_from_events
 from models import ChannelConfig, TestConfig
 
+def test_defrost_only_change_does_not_create_phantom_cycle_boundary(channel_config, test_config):
+    """
+    Regression test for a real bug found validating against the 7272
+    sample file at ~17:39-17:55 on 28 Jan 2026: a defrost-only transition
+    row can have "Event 1 Unit On" sitting at value 1 even though Unit On
+    itself did NOT change on that row. Filtering event rows purely by
+    their Unit On *value* (rather than whether Unit On changed) incorrectly
+    treated that row as a fresh "on" event, pairing it with the next real
+    off-event 2 seconds later and fabricating a bogus near-instantaneous
+    cycle (duty_cycle ~0.0037 in the real output).
+
+    Real sequence, condensed to the event-only rows (matching the actual
+    CSV):
+        t=0        Unit On 1->0              (real compressor off)
+        t=18s      Defrost 0->1, Unit On=0   (defrost heater starting; Unit On unchanged)
+        t=18s      Unit On 0->1, Defrost=1   (same timestamp: heater draws through Unit On signal)
+        t=16m      Defrost 1->0, Unit On=1   (defrost heater off -- Unit On UNCHANGED, still 1)
+        t=16m2s    Unit On 1->0, Defrost=0   (real compressor/unit off)
+
+    Correct result: exactly ONE on/off pair (on at t=18s, off at t=16m2s).
+    The row at t=16m must NOT be treated as an "on" event just because
+    its Unit On value happens to be 1.
+    """
+    base = pd.Timestamp("2026-01-28 17:39:00")
+    events_df = pd.DataFrame({
+        "Timestamp": [
+            base,
+            base + pd.Timedelta(seconds=18),
+            base + pd.Timedelta(seconds=18),
+            base + pd.Timedelta(minutes=16),
+            base + pd.Timedelta(minutes=16, seconds=2),
+        ],
+        "Event 1 Unit On": [0, 0, 1, 1, 0],
+        "Event 2 Defrost": [0, 1, 1, 0, 0],
+        "Watt-Hours": [1974, 1974, 1974, 2056, 2056],
+    })
+
+    raw_df = pd.DataFrame({
+        "Timestamp": pd.date_range(base - pd.Timedelta(minutes=1), periods=2000, freq="s"),
+    })
+
+    boundaries = _find_boundaries_from_events(events_df, raw_df, channel_config, test_config)
+
+    assert len(boundaries.time_on) == 1, (
+        f"Expected exactly 1 cycle, got {len(boundaries.time_on)} -- "
+        f"a Defrost-only transition likely got mistaken for a Unit On event"
+    )
+    assert len(boundaries.time_off) == 1
+
+    expected_on = base + pd.Timedelta(seconds=18)
+    expected_off = base + pd.Timedelta(minutes=16, seconds=2)
+    assert boundaries.time_on[0] == expected_on
+    assert boundaries.time_off[0] == expected_off
+    # assert boundaries.cyclic is True
+
+def test_rapid_genuine_unit_on_transitions_are_still_captured(channel_config, test_config):
+    """
+    Contrast case for the fix above: confirms that filtering by 'did Unit
+    On actually change' doesn't accidentally suppress legitimate rapid
+    on/off/on toggling -- only rows where Unit On's value is unchanged
+    should be excluded.
+    """
+    base = pd.Timestamp("2026-01-28 12:00:00")
+    events_df = pd.DataFrame({
+        "Timestamp": [
+            base,
+            base + pd.Timedelta(seconds=5),
+            base + pd.Timedelta(seconds=10),
+        ],
+        "Event 1 Unit On": [1, 0, 1],
+        "Event 2 Defrost": [0, 0, 0],
+        "Watt-Hours": [100, 100, 101],
+    })
+    raw_df = pd.DataFrame({
+        "Timestamp": pd.date_range(base - pd.Timedelta(seconds=5), periods=100, freq="s"),
+    })
+
+    boundaries = _find_boundaries_from_events(events_df, raw_df, channel_config, test_config)
+
+    assert len(boundaries.time_on) == 1
+    assert boundaries.time_on[0] == base
+    assert boundaries.time_off[0] == base + pd.Timedelta(seconds=5)
 
 def make_stats_raw_df(n_rows: int = 300) -> pd.DataFrame:
     """

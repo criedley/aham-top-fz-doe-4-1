@@ -44,7 +44,7 @@ def load_datacart_csv(path: str | Path, alias_map: dict[str, list[str]],
 
     _check_minimum_scans(raw_df)
     _check_uneven_scans(raw_df, on_missing_event_row)
-
+    
     events_df = _extract_events(raw_df)
     events_df = _dedupe_events(events_df)
 
@@ -192,10 +192,21 @@ def _check_uneven_scans(df: pd.DataFrame, on_missing_event_row: str) -> None:
             raise ImportError(msg)
         logger.warning(msg)
 
+
 # ---------------------------------------------------------------------------
 # Event extraction (diff-based -- see prior discussion on why this replaces
 # the VBA's "insert synthetic row for missed transition" workaround)
 # ---------------------------------------------------------------------------
+
+def _event_state_columns(df: pd.DataFrame) -> list[str]:
+    """
+    Columns representing actual event STATE (e.g. "Event 1 Unit On",
+    "Event 2 Defrost", "Event 3 Comp") -- deliberately excludes the
+    "Event Count N ..." columns, which are monotonically-incrementing
+    counters, not state flags, and must never be used to judge whether
+    two event rows represent the same state.
+    """
+    return [c for c in df.columns if c.lower().startswith("event") and "count" not in c.lower()]
 
 def _extract_events(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -204,13 +215,11 @@ def _extract_events(df: pd.DataFrame) -> pd.DataFrame:
     dedicated event rows emitted by the data cart and transitions that
     happen to fall between two regular scans.
     """
-    state_cols = [c for c in df.columns if c.lower().startswith("event")]
+    state_cols = _event_state_columns(df)
     if not state_cols:
-        return df.iloc[0:0]  # empty events frame -> triggers fixed-window fallback
-
+        return df.iloc[0:0]
     changed = (df[state_cols].diff().fillna(0) != 0).any(axis=1)
-    events_df = df.loc[changed].copy()
-    return events_df.reset_index(drop=True)
+    return df.loc[changed].reset_index(drop=True)
 
 
 def _dedupe_events(events_df: pd.DataFrame) -> pd.DataFrame:
@@ -222,15 +231,14 @@ def _dedupe_events(events_df: pd.DataFrame) -> pd.DataFrame:
     if events_df.empty:
         return events_df
 
+    state_cols = _event_state_columns(events_df)
     keep = [0]
     for i in range(1, len(events_df)):
         prev_idx = keep[-1]
         gap_s = (events_df["Timestamp"].iloc[i] - events_df["Timestamp"].iloc[prev_idx]).total_seconds()
-        same_state = events_df.iloc[i].drop("Timestamp").equals(
-            events_df.iloc[prev_idx].drop("Timestamp")
-        )
+        same_state = events_df.iloc[i][state_cols].equals(events_df.iloc[prev_idx][state_cols])
         if gap_s < DUPLICATE_EVENT_WINDOW_S and same_state:
-            continue  # duplicate/false event, drop it
+            continue
         keep.append(i)
 
     return events_df.iloc[keep].reset_index(drop=True)
