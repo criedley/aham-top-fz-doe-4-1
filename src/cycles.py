@@ -122,6 +122,7 @@ def _find_boundaries_from_events(events_df: pd.DataFrame, raw_df: pd.DataFrame,
 
 def _find_boundaries_fixed_window(raw_df: pd.DataFrame,
                                    config: ChannelConfig) -> CycleBoundaries:
+    # always builds bw_cols from both FF and FZ channels, with no fz_only branching at all.
     timestamps = raw_df["Timestamp"]
     bw_cols = [c for c in (
         config.ff_bw1_col, config.ff_bw2_col, config.ff_bw3_col,
