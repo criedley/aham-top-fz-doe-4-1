@@ -1,4 +1,5 @@
 # scratch_run.py — run this from the project root
+import pandas as pd
 import logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s [%(name)s] %(message)s")
 
@@ -9,59 +10,19 @@ from io_import import load_datacart_csv
 from setup import build_channel_config
 from cycles import detect_cycles
 from models import TestConfig
-
-# Normalizes raw header spelling -> the exact names io_import.py's
-# _validate_required_columns and REQUIRED_COLUMNS expect.
-ALIAS_MAP = {
-    "FF BW 1": ["FF BW1"],
-    "FF BW 2": ["FF BW2"],
-    "FF BW 3": ["FF BW3"],
-    "FZ BW 1": ["FZ BW1"],
-    "FZ BW 2": ["FZ BW2"],
-    "FZ BW 3": ["FZ BW3"],
-    "RSOC HI": ["RSOC UP"],
-    "RSOC Mid": ["RSOC MD"],
-    "RSOC LO": ["RSOC LO"],
-    "LSOC HI": ["LSOC UP"],
-    "LSOC Mid": ["LSOC MD"],
-    "LSOC LO": ["LSOC LO"],
-    "Watts": ["Watts"],
-    "Watt-Hours": ["Watt-Hours"],
-    "Event 1 Unit On": ["Event 1 Unit On"],
-    "Event 2 Defrost": ["Event 2 Defrost"],
-    "Event 3 Comp": ["Event 3 Comp"],
-}
-
-# Bridges REQUIRED_ROLES (role names) -> the now-normalized column names above.
-CHANNEL_MAP = {
-    "Watts": "Watts",
-    "Watt-Hours": "Watt-Hours",
-    "Unit On": "Event 1 Unit On",
-    "Defrost On": "Event 2 Defrost",
-    "RSOC Mid": "RSOC Mid",
-    "LSOC Mid": "LSOC Mid",
-    "RSOC HI": "RSOC HI",
-    "RSOC LO": "RSOC LO",
-    "LSOC HI": "LSOC HI",
-    "LSOC LO": "LSOC LO",
-    "FF BW 1": "FF BW 1",
-    "FF BW 2": "FF BW 2",
-    "FF BW 3": "FF BW 3",
-    "FZ BW 1": "FZ BW 1",
-    "FZ BW 2": "FZ BW 2",
-    "FZ BW 3": "FZ BW 3",
-}
+from checks import check_stability
+from channel_defaults import ALIAS_MAP, CHANNEL_MAP
 
 TEST_CONFIG = TestConfig(
-    height_in=55.0,
-    height_adjusted_in=65.0,
+    height_in=68.5,
+    height_adjusted_in=78.5,
     ct=96.0,
     fz_only=False,
     fz_only_kfactor=1.0,
     adjusted_start=False,
 )
 
-CSV_PATH = "data/7272_RAW-DATA___008_27JAN20261051_T25013475_001.csv"  # adjust if needed
+CSV_PATH = "tests/fixtures/sample_raw.csv"  # adjust if needed
 
 print("=" * 70)
 print("STEP 1: load_datacart_csv")
@@ -96,7 +57,6 @@ known_transitions = [
     "2026-01-28 23:23:53",
     "2026-01-29 08:57:28",
 ]
-import pandas as pd
 for ts_str in known_transitions:
     ts = pd.Timestamp(ts_str)
     nearby_on = cycle_data.cycles[(cycle_data.cycles["time_on"] - ts).abs().dt.total_seconds() < 120]
