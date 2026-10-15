@@ -30,7 +30,7 @@ MIN_EP1_WINDOW_MIN = 420          # 7 hours, matches "seven hour period for EP1,
 
 def check_gradient(raw_df: pd.DataFrame, config: ChannelConfig,
                     start: int, end: int, test_config: TestConfig) -> GradientResult:
-    """Equivalent of Gradientcheck."""
+    """Equivalent of Gradientcheck. check_gradient is unrounded and signed over a caller-supplied window, while cycle_data.cycles["r_grad"] is rounded and absolute per cycle."""
     rsoc_hi_avg = raw_df[config.rsoc_hi_col].iloc[start:end + 1].mean()
     rsoc_lo_avg = raw_df[config.rsoc_lo_col].iloc[start:end + 1].mean()
     lsoc_hi_avg = raw_df[config.lsoc_hi_col].iloc[start:end + 1].mean()
@@ -88,7 +88,7 @@ def _check_stability_fixed_window(raw_df: pd.DataFrame, bw_channels: list[str],
     """
     delta = 300
     threshold = (delta / 60) * STABILITY_RATE_PER_HOUR
-    start = cycle_data.cycles["index_on"].iloc[0] if len(cycle_data.cycles) else 1
+    start = int(cycle_data.cycles["index_on"].iloc[0])
     n = len(raw_df)
 
     r = start
