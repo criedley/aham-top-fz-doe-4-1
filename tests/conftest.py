@@ -1,7 +1,40 @@
 # tests/conftest.py
+from pathlib import Path
+
 import pytest
 import pandas as pd
+
 from models import ImportResult, ChannelConfig, TestConfig, CycleData
+from io_import import load_datacart_csv
+from setup import build_channel_config
+from cycles import detect_cycles
+from channel_defaults import ALIAS_MAP, CHANNEL_MAP
+
+FIXTURE_PATH = Path(__file__).parent / "fixtures" / "sample_raw.csv"
+
+@pytest.fixture
+def alias_map():
+    return ALIAS_MAP
+
+@pytest.fixture
+def channel_map():
+    return CHANNEL_MAP
+
+@pytest.fixture
+def real_test_config():
+    return TestConfig(height_in=68.5, height_adjusted_in=78.5, ct=96.0,
+                      fz_only=False, fz_only_kfactor=1.0, adjusted_start=False)
+
+@pytest.fixture
+def real_pipeline(alias_map, channel_map, real_test_config):
+    imp = load_datacart_csv(FIXTURE_PATH, alias_map)
+    config = build_channel_config(imp, channel_map)
+    cycle_data = detect_cycles(imp, config, real_test_config)
+    return imp, config, cycle_data
+
+@pytest.fixture(scope="session")
+def real_import_result():
+    return load_datacart_csv(FIXTURE_PATH, alias_map)
 
 @pytest.fixture
 def sample_import_result():
