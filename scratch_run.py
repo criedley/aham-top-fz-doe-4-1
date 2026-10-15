@@ -103,3 +103,9 @@ for ts_str in known_transitions:
     nearby_off = cycle_data.cycles[(cycle_data.cycles["time_off"] - ts).abs().dt.total_seconds() < 120]
     match = "ON match" if not nearby_on.empty else ("OFF match" if not nearby_off.empty else "NO MATCH")
     print(f"{ts_str}: {match}")
+
+print("\n" + "=" * 70)
+print("STEP 5: Check stability")
+print("=" * 70)
+result = check_stability(import_result.raw_df, cycle_data, config, TEST_CONFIG)
+print(result)
