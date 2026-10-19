@@ -70,7 +70,11 @@ def check_stability(raw_df: pd.DataFrame, cycle_data: CycleData,
 
 
 def _select_channels(config: ChannelConfig, fz_only: bool) -> list[str]:
-    """FZOnly checks only freezer channels; otherwise FF + FZ."""
+    """
+    FZOnly checks only freezer channels; otherwise FF + FZ. 
+    Macro's cyclic StabilityCheck never assigns the FF window averages, 
+    so it effectively checks FZ only. We follow ETP 8.4.1 (all compartments).
+    """
     fz_cols = [c for c in (config.fz_bw1_col, config.fz_bw2_col, config.fz_bw3_col,
                            config.fz_bw4_col, config.fz_bw5_col) if c is not None]
     if fz_only:
@@ -99,6 +103,12 @@ def _check_stability_fixed_window(raw_df: pd.DataFrame, bw_channels: list[str],
         diffs = (window_a.mean() - window_b.mean()).abs()
         if (diffs <= threshold).all():
             end_row = r + delta + WINDOW_ROWS
+            """
+            NOTE: iloc[1], not iloc[0], on purpose. This reproduces the macro's
+            673.7 min on the 7272 sample file (Book.xlsx). The VBA reads Cells(2, 1),
+            and why that lands on raw_df row 1 is not explained yet. Don't change
+            it without re-checking against a macro report.
+            """
             test_duration = (raw_df["Timestamp"].iloc[end_row] - raw_df["Timestamp"].iloc[1]).total_seconds() / 60
             return StabilityResult(
                 is_stable=True, stable_cycle=None, start_t1_index=None, end_t1_index=None,
