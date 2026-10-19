@@ -66,8 +66,7 @@ def check_stability(raw_df: pd.DataFrame, cycle_data: CycleData,
 
     if not cycle_data.cyclic:
         return _check_stability_fixed_window(raw_df, bw_channels, cycle_data, test_config)
-    return _check_stability_cyclic(raw_df, bw_channels, cycle_data, test_config)
-
+    return _check_stability_cyclic(raw_df, bw_channels, cycle_data, config, test_config)
 
 def _select_channels(config: ChannelConfig, fz_only: bool) -> list[str]:
     """
@@ -124,7 +123,8 @@ def _check_stability_fixed_window(raw_df: pd.DataFrame, bw_channels: list[str],
 
 
 def _check_stability_cyclic(raw_df: pd.DataFrame, bw_channels: list[str],
-                             cycle_data: CycleData, test_config: TestConfig) -> StabilityResult:
+                             cycle_data: CycleData, config: ChannelConfig,
+                             test_config: TestConfig) -> StabilityResult:
     """
     Cyclic path: grows three cycle-index gaps (J->K >= 120min, K->L >= 180min,
     L->M >= 120min) and compares channel averages between the J:K window and
@@ -167,8 +167,7 @@ def _check_stability_cyclic(raw_df: pd.DataFrame, bw_channels: list[str],
                 logger.info("Defrost occurred before stability confirmed; restarting search at cycle %d", defrost_idx)
                 j = defrost_idx  # equivalent of "GoTo ReCheckStability" with defcheckcounter advanced
                 continue
-            return _finalize_stability(raw_df, cycle_data, stable_cycle=m - 1)
-
+            return _finalize_stability(raw_df, cycle_data, config, stable_cycle=m - 1)
         j += 1
 
     return StabilityResult(
@@ -218,7 +217,26 @@ def _find_defrost_before(raw_df: pd.DataFrame, cycle_data: CycleData, start_cycl
     return None
 
 
-def _finalize_stability(raw_df: pd.DataFrame, cycle_data: CycleData, stable_cycle: int) -> StabilityResult:
+def _t1_window_averages(cycles: pd.DataFrame, start: int, end: int,
+                        config: ChannelConfig) -> tuple[float, float]:
+    """
+    FFAvg / FZAvg: mean over cycles start..end (inclusive) of each channel's
+    per-cycle average, then the mean across channels. Plain cycle-count
+    weighting, matching the VBA's sum / (I - J).
+    Only channels that are actually configured are included.
+    """
+    window = cycles.iloc[start:end + 1]
+    ff_cols = ["ff_bw1", "ff_bw2", "ff_bw3"]
+    fz_cols = ["fz_bw1", "fz_bw2", "fz_bw3"]
+    if config.fz_bw4_col is not None:
+        fz_cols.append("fz_bw4")
+    if config.fz_bw5_col is not None:
+        fz_cols.append("fz_bw5")
+    return float(window[ff_cols].mean().mean()), float(window[fz_cols].mean().mean())
+
+
+def _finalize_stability(raw_df: pd.DataFrame, cycle_data: CycleData,
+                        config: ChannelConfig, stable_cycle: int) -> StabilityResult:
     """
     Finds the 7-hour (420 min) EP1/T1 window ending at the stable cycle,
     matching "Find seven hour period for EP1, T1".
@@ -236,6 +254,7 @@ def _finalize_stability(raw_df: pd.DataFrame, cycle_data: CycleData, stable_cycl
     ep1 = (watt_hours[stable_cycle + 1] - watt_hours[j]) / 1000
     t1_minutes = (time_on[stable_cycle + 1] - time_on[j]).total_seconds() / 60
     test_duration = (time_on[stable_cycle + 1] - raw_df["Timestamp"].iloc[1]).total_seconds() / 60
+    ff_avg, fz_avg = _t1_window_averages(cycles, j, stable_cycle, config)
 
     return StabilityResult(
         is_stable=True,
@@ -245,5 +264,7 @@ def _finalize_stability(raw_df: pd.DataFrame, cycle_data: CycleData, stable_cycl
         t1_minutes=t1_minutes,
         ep1=ep1,
         test_duration_min=test_duration,
+        ff_avg=ff_avg,
+        fz_avg=fz_avg,
     )
 
