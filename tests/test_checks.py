@@ -1,4 +1,5 @@
 """
+tests/test_checks.py
 Tests for checks.py, covering:
   1. Contract tests for the simple aggregation functions (Gradientcheck/AmbientCheck equivalents)
   2. Failure-path tests for every raise condition in the stability search
@@ -123,9 +124,9 @@ def test_perfectly_flat_data_is_judged_stable_cyclic(channel_config, test_config
     index_on = list(range(0, 2900, 60))  # evenly spaced cycles, 60 min apart
     cycle_data = make_cycle_data(index_on=index_on, cyclic=True)
     result = check_stability(raw_df, cycle_data, channel_config, test_config)
-    assert result.is_stable is True
-    assert result.ep1 is not None
-    assert result.start_t1_index is not None
+    assert result.is_stable
+    assert result.ff_avg == pytest.approx(38.0)
+    assert result.fz_avg == pytest.approx(0.0)
 
 def test_fz_only_ignores_ff_drift(channel_config, test_config_fz_only):
     """
@@ -147,6 +148,14 @@ def test_not_fz_only_fails_on_ff_drift(channel_config, test_config):
     cycle_data = make_cycle_data(index_on=[1], cyclic=False)
     result = check_stability(raw_df, cycle_data, channel_config, test_config)
     assert result.is_stable is False
+
+def test_ff_drift_fails_full_check_but_not_fz_only(channel_config, test_config, test_config_fz_only):
+    raw_df = make_perfectly_stable_raw_df(3000)
+    raw_df["FF BW 1"] = [38.0 + i * 0.01 for i in range(len(raw_df))]   # FF drifts, FZ flat
+    cycle_data = make_cycle_data(index_on=list(range(0, 2900, 60)), cyclic=True)
+
+    assert not check_stability(raw_df, cycle_data, channel_config, test_config).is_stable
+    assert check_stability(raw_df, cycle_data, channel_config, test_config_fz_only).is_stable
 
 
 # ---------------------------------------------------------------------------
