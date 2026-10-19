@@ -108,3 +108,16 @@ class StabilityResult:
     ep1: float | None               # EP1, computed here since it's derived from the same window search
     test_duration_min: float | None # TestDuration
     reason: str | None = None       # replaces the MsgBox failure messages
+    end_row_index: int | None = None
+    end_row_index: int | None = None
+    ff_avg: float | None = None     # FFAvg: mean of per-cycle FF channel averages over the T1 window
+    fz_avg: float | None = None     # FZAvg: same for FZ channels
+
+@dataclass
+class EnergyResult:
+    ep1: float       # kWh
+    ep2: float       # kWh
+    t1: float        # minutes
+    t2: float        # minutes
+    et: float        # kWh/day
+    et_corr: float   # kWh/day, after the freezer-only K-factor

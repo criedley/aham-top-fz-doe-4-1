@@ -112,6 +112,7 @@ def _check_stability_fixed_window(raw_df: pd.DataFrame, bw_channels: list[str],
             return StabilityResult(
                 is_stable=True, stable_cycle=None, start_t1_index=None, end_t1_index=None,
                 t1_minutes=None, ep1=None, test_duration_min=test_duration,
+                end_row_index=end_row,
             )
         r += 1
 
