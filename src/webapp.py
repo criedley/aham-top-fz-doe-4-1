@@ -1,4 +1,5 @@
-# src/aham/webapp.py
+# src/webapp.py
+
 from pathlib import Path
 
 from fastapi import FastAPI, Request, UploadFile
@@ -18,9 +19,11 @@ CONFIG_PATH = Path("config/channel_map.yaml")
 ALIAS_MAP: dict[str, list[str]] = {}  # load your real channel_aliases.yaml here
 
 def _as_str(value: object) -> str | None:
-    """Form fields we expect to be plain text (dropdowns, hidden inputs)
+    """
+    Form fields we expect to be plain text (dropdowns, hidden inputs)
     should never actually be UploadFile objects -- this narrows the type
-    for the type checker and guards against a malformed submission."""
+    for the type checker and guards against a malformed submission.
+    """
     return value if isinstance(value, str) else None
 
 @app.get("/", response_class=HTMLResponse)
