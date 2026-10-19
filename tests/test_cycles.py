@@ -244,14 +244,14 @@ def test_duty_cycle_matches_hand_computed_value(channel_config, test_config):
     Timestamps are 1 min apart, so:
         on_duration = 50 min
         total_min   = 100 min   (no -1 min adjustment; matches the report's % Runtime)
-        duty_cycle  = 50 / 99
+        duty_cycle  = 50 / 100
     """
     raw_df = make_stats_raw_df()
     boundaries = make_three_cycle_boundaries(raw_df)
 
     result = _compute_cycle_stats(raw_df, boundaries, channel_config, test_config)
 
-    expected = 50 / 99
+    expected = 50 / 100
     assert result.loc[0, "duty_cycle"] == pytest.approx(expected, rel=1e-6)
 
 def test_last_cycle_duty_cycle_uses_last_scan_time(channel_config, test_config):
