@@ -258,15 +258,17 @@ def _compute_cycle_stats(raw_df: pd.DataFrame, boundaries: CycleBoundaries,
         r_grad = abs(round((rsoc_hi_avg - rsoc_lo_avg) / height_ft, 3))
         l_grad = abs(round((lsoc_hi_avg - lsoc_lo_avg) / height_ft, 3))
 
-        # Duty cycle: on-duration / (time to next cycle start - 1 min),
-        # matching Setup.bas's Cells(I+1,6) formula. Last cycle uses
-        # last_scan_time in place of the next cycle's start.
+        # Duty cycle: on-duration / time to next cycle start (last cycle uses
+        # last_scan_time). Matches the macro report's "% Runtime". Setup.bas's
+        # Cycles-sheet formula subtracts 1 minute from the denominator, which
+        # gives values above 100% for cycles with almost no off time (e.g. 1.0158
+        # for cycle 21 in the 7272 file, which the report shows as 99.34%).
         time_on_i = boundaries.time_on[i]
         time_off_i = boundaries.time_off[i]
         next_time_on = boundaries.time_on[i + 1] if i + 1 < n else boundaries.last_scan_time
 
         on_duration_min = (time_off_i - time_on_i).total_seconds() / 60
-        total_min = (next_time_on - time_on_i).total_seconds() / 60 - 1
+        total_min = (next_time_on - time_on_i).total_seconds() / 60
         duty_cycle = on_duration_min / total_min if total_min > 0 else float("nan")
 
         records.append({
