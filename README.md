@@ -13,23 +13,24 @@ replaces the Excel "Data Sheet" dropdowns with a browser-based form.
 
 ## Status
 
-This is an active port, not a finished tool. **It cannot yet produce a
-final energy result or report.**
+This is an active port. The cyclic-test pipeline (import, cycles, stability,
+EP1/T1, EP2/T2, ET) reproduces the original macro on one real file. Fixed-window
+(100% duty cycle) tests, the rendered report and the web-app integration are not
+finished.
 
-| Module | Replaces | Status |
-|---|---|---|
-| `io_import.py` | `Module1.bas` (`ImportData`, `CorrectNames`) | ✅ Implemented, tested, validated on a real file |
-| `setup.py` | `Setup.bas` (`SetupVars`, `AvailChannel`, `RowCol`) | ✅ Implemented, tested |
-| `cycles.py` | `Setup.bas` (`GetCycles`) + `Module1.bas` (`Run100`) | ✅ Event-based path validated on a real file; fixed-window (`Run100`) path not yet validated |
-| `checks.py` | `Checks.bas` (stability, gradient, ambient) | 🟡 Cyclic stability path matches the original macro on one file; other paths not yet validated (see below) |
-| `models.py` | shared `Public` variables | ✅ Implemented |
-| `webapp.py` | `AddDataSheet`, `CheckUserInput` | ✅ Collects and validates technician input |
-| `part_one.py` | `PartOne.bas` (`EP1Calc`, `ECalc`) | 🚧 Not started |
-| `defrost.py` | `DefrostPortion.bas` (`EP2calc`) | 🚧 Not started |
-| `report.py` | `TestSummary.bas` | 🚧 Not started |
-| `security.py` | `SecurityModule.bas` | 🚧 Not started |
-| `main.py` | `AHAM()` orchestration | 🚧 Partial; the full pipeline is blocked on the modules above |
-
+| Module         | Replaces                                             | Status                                                                                                    |
+| -------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `io_import.py` | `Module1.bas` (`ImportData`, `CorrectNames`)         | ✅ Implemented, tested, validated on a real file                                                           |
+| `setup.py`     | `Setup.bas` (`SetupVars`, `AvailChannel`, `RowCol`)  | ✅ Implemented, tested                                                                                     |
+| `cycles.py`    | `Setup.bas` (`GetCycles`) + `Module1.bas` (`Run100`) | ✅ Event-based path validated on a real file; fixed-window (`Run100`) path not yet validated               |
+| `checks.py`    | `Checks.bas` (stability, gradient, ambient)          | 🟡 Cyclic stability path matches the original macro on one file; other paths not yet validated (see below) |
+| `models.py`    | shared `Public` variables                            | ✅ Implemented                                                                                             |
+| `webapp.py`    | `AddDataSheet`, `CheckUserInput`                     | ✅ Collects and validates technician input                                                                 |
+| `part_one.py`  | `PartOne.bas` (`EP1Calc`, `ECalc`)                   | ✅ `calc_et` validated on a real file; `calc_ep1_fixed_window` (non-cyclic) not validated                  |
+| `defrost.py`   | `DefrostPortion.bas` (`EP2calc`)                     | 🟡 Cyclic path validated on a real file; non-cyclic watt-band path not ported                              |
+| `report.py`    | `TestSummary.bas`                                    | 🟡 Report numbers built; rendering and the T2 segment table not done                                       |
+| `security.py`  | `SecurityModule.bas`                                 | 🚧 Not started                                                                                             |
+| `main.py`      | `AHAM()` orchestration                               | 🟡 `run_analysis` covers cyclic tests; raises `NotImplementedError` for fixed-window                       |
 ### Validation against the original macro
 
 The sample file `7272_RAW-DATA___008_27JAN20261051_T25013475_001.csv` was
@@ -157,7 +158,6 @@ uv run pytest -x --tb=long   # stop at first failure, full traceback
 ```
 .
 ├── config/        # saved technician configuration
-├── data/          # uploaded / raw data-cart CSV files
 ├── src/
 │   ├── models.py      # shared dataclasses
 │   ├── io_import.py   # CSV parsing, cleaning, event extraction
@@ -198,27 +198,46 @@ can be tested on its own.
   example, test duration is measured from the second scan because that
   matches the macro's output.
 
+
+## Known differences from the original macro
+
+Where the port deliberately differs from the VBA. Each of these is intentional.
+
+- **Ambient / Gradient flags.** The port checks the main cycle table up to the
+  stable cycle only. The macro also tests the T2 segment rows using
+  `If I <= stabcycle`, which compares a T2 row number with the stable cycle
+  number. That looks accidental, so it isn't reproduced. A file with an
+  out-of-band T2 segment could show `TRUE` here where the macro shows `FALSE`.
+- **Cabinet height is technician input.** Gradients use the height entered on the
+  Data Sheet plus 10" for thermocouple offset. The CSV header's `CABINET_HEIGHT` can
+  differ (7272: header 68.5, entered 71) and must not be used as a substitute.
+- **FF channels in the cyclic stability check.** The port checks FF and FZ
+  (ETP 8.4.1: "all measured compartments"). In the macro's cyclic
+  `StabilityCheck` the FF window averages are never assigned, so the FF
+  comparison always passes. The port can reject a test the macro accepts.
+- **K-factor.** Applied to `ET` unconditionally, as in the macro's cyclic
+  path. The macro's non-cyclic `ECalc` applies it only when freezer-only is
+  set. Only K = 1 has been checked against the macro.
+- **Duty cycle.** Computed as on-time divided by cycle duration, as in the
+  macro report's "% Runtime". The Cycles-sheet formula in `Setup.bas`
+  subtracts one minute, which gives values above 100% for cycles with almost
+  no off time.
+- **Freezer-only runs.** The macro calls `EP2calc` before it computes the T1
+  averages, so it compares against unset or stale values. The port uses the
+  computed T1 averages. Results can differ from the macro on those files.
+- **Window midpoints in the cyclic stability check** use the last row of each
+  window, where the VBA uses cycle on/off times. This changes the threshold
+  slightly and is not yet matched.
+
 ## Known limitations
 
-- Energy calculations (EP1/EP2/ET), the report and the full `main.py`
-  pipeline are not implemented.
-- **`checks.py` differs from the VBA in two ways:**
-  - Window midpoints in the cyclic stability check use the last row of
-    each window. The VBA uses cycle off/on times, which changes the
-    threshold slightly.
-  - It checks FF channels in the cyclic branch. The VBA may effectively
-    check FZ only there. This is unconfirmed.
-
-  Neither mattered on the sample file, where stability passed on the first
-  window, but either could matter on a borderline file.
+- Fixed-window (non-cyclic) tests aren't supported end to end: `run_analysis`
+  raises `NotImplementedError`.
 - The defrost-restart path in the cyclic stability check is only covered
   by a skipped synthetic test. The sample file stabilizes before its
   defrost, so real data hasn't exercised it.
 - The non-cyclic stability path and the 100%-duty-cycle fallback
   (`Run100`) haven't been validated against real files.
-- A cycle immediately before a defrost can report a duty cycle above 1.0
-  because its off-period is only seconds long. The arithmetic is correct,
-  but the value isn't meaningful. It is currently unflagged.
 - The VBA's second unconditional duplicate-event pass isn't ported.
 - Only one real data file has been checked against the original macro.
 - The tool is intended for trusted lab use. File uploads are saved under a
