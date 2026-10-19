@@ -294,6 +294,16 @@ def test_duty_cycle_is_nan_when_total_window_is_not_positive(channel_config, tes
     assert pd.isna(result.loc[0, "duty_cycle"])
 
 
+def test_duty_cycle_never_exceeds_one_on_real_file(real_pipeline):
+    _, _, cycle_data = real_pipeline
+    duty = cycle_data.cycles["duty_cycle"].dropna()
+    assert (duty <= 1.0).all()
+
+    # Cycle 21 (16:53:57 to 17:39:05, just before the defrost): the macro report shows 99.34%.
+    cycle_21 = cycle_data.cycles.loc[cycle_data.cycles["cycle_num"] == 21, "duty_cycle"].iloc[0]
+    assert cycle_21 == pytest.approx(0.9934, abs=0.001)
+
+
 # ---------------------------------------------------------------------------
 # Failure path
 # ---------------------------------------------------------------------------
