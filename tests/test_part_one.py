@@ -18,11 +18,12 @@ def test_ct_of_12_makes_defrost_term_unscaled():
     assert r.et == pytest.approx(2.0 + 0.416667, rel=1e-5)           # 2.416667
 
 
-def test_k_factor_applied_only_when_fz_only():
-    on = calc_et(1.0, 720, 0.5, 60, 96, fz_only=True, fz_only_kfactor=0.85)
-    off = calc_et(1.0, 720, 0.5, 60, 96, fz_only=False, fz_only_kfactor=0.85)
-    assert on.et_corr == pytest.approx(on.et * 0.85)
-    assert off.et_corr == pytest.approx(off.et)       # ECalc ignores K when not FZ-only
+def test_k_factor_applied_to_et_regardless_of_fz_only():
+    # Macro's cyclic path computes ETcorr = ET * K whether or not FZOnly is set,
+    # and the ETP defines K by product class, not by a freezer-only flag.
+    for fz_only in (True, False):
+        r = calc_et(1.0, 720, 0.5, 60, 96, fz_only=fz_only, fz_only_kfactor=0.85)
+        assert r.et_corr == pytest.approx(r.et * 0.85)
 
 
 @pytest.mark.parametrize("t1, ct", [(0, 96), (-5, 96), (720, 0), (720, -1)])
@@ -56,3 +57,4 @@ def test_calc_et_reproduces_macro_on_7272_file():
                 fz_only=False, fz_only_kfactor=1.0)
     assert r.et == pytest.approx(1.677, abs=0.002)
     assert r.et_corr == pytest.approx(1.677, abs=0.002)
+
