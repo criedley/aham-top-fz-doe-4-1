@@ -22,7 +22,7 @@ def channel_map():
 
 @pytest.fixture
 def real_test_config():
-    return TestConfig(height_in=68.5, height_adjusted_in=78.5, ct=96.0,
+    return TestConfig(height_in=68.5, height_adjusted_in=78.5, ct=10.0,
                       fz_only=False, fz_only_kfactor=1.0, adjusted_start=False)
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def real_pipeline(alias_map, channel_map, real_test_config):
 
 @pytest.fixture(scope="session")
 def real_import_result():
-    return load_datacart_csv(FIXTURE_PATH, alias_map)
+    return load_datacart_csv(FIXTURE_PATH, ALIAS_MAP)
 
 @pytest.fixture
 def sample_import_result():
@@ -61,13 +61,13 @@ def channel_config():
 @pytest.fixture
 def test_config():
     return TestConfig(
-        height_in=55.0, height_adjusted_in=65.0, ct=96.0,
+        height_in=55.0, height_adjusted_in=65.0, ct=10.0,
         fz_only=False, fz_only_kfactor=1.0, adjusted_start=False,
     )
 
 @pytest.fixture
 def test_config_fz_only():
     return TestConfig(
-        height_in=55.0, height_adjusted_in=65.0, ct=96.0,
+        height_in=55.0, height_adjusted_in=65.0, ct=10.0,
         fz_only=True, fz_only_kfactor=0.85, adjusted_start=False,
     )
