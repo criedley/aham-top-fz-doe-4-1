@@ -16,7 +16,7 @@ from channel_defaults import ALIAS_MAP, CHANNEL_MAP
 TEST_CONFIG = TestConfig(
     height_in=68.5,
     height_adjusted_in=78.5,
-    ct=96.0,
+    ct=10.0,
     fz_only=False,
     fz_only_kfactor=1.0,
     adjusted_start=False,
