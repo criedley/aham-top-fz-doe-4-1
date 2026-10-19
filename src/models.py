@@ -68,6 +68,10 @@ class TestConfig:
             raise ValueError("CT value must be entered and greater than zero")  # replaces CheckUserInput
         if self.adjusted_start and self.time_to_start is None:
             raise ValueError("adjusted_start=True requires time_to_start to be set")
+        if self.fz_only_kfactor not in (1.0, 0.85, 0.7):
+            raise ValueError(
+                f"fz_only_kfactor must be 1, 0.85, or 0.7 (per AHAM spec), got {self.fz_only_kfactor}"
+            )
 
     def gradient_limit(self) -> float:
         """Equivalent to GradientLimit = 0.5 * hght / 12 (feet)."""
