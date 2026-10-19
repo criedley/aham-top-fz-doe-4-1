@@ -256,19 +256,18 @@ def test_duty_cycle_matches_hand_computed_value(channel_config, test_config):
 
 def test_last_cycle_duty_cycle_uses_last_scan_time(channel_config, test_config):
     """
-    Cycle 2 (the last cycle, index 2 of 3): on at row 200, off at row 250,
-    and since there's no next cycle, the formula should use last_scan_time
-    (row 299) in place of a next cycle's on-time:
-      on_duration = 50 min
-      total_min   = (299 - 200) - 1 = 98 min
-      duty_cycle  = 50 / 98
+    Cycle 2 (the last cycle): on at row 200, off at row 250, and last_scan_time
+    is row 299:
+        on_duration = 50 min
+        total_min   = 299 - 200 = 99 min
+        duty_cycle  = 50 / 99
     """
     raw_df = make_stats_raw_df()
     boundaries = make_three_cycle_boundaries(raw_df)
 
     result = _compute_cycle_stats(raw_df, boundaries, channel_config, test_config)
 
-    expected = 50 / 100
+    expected = 50 / 99
     assert result.loc[2, "duty_cycle"] == pytest.approx(expected, rel=1e-6)
 
 def test_duty_cycle_is_nan_when_total_window_is_not_positive(channel_config, test_config):
