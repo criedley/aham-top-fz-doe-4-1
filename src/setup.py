@@ -1,5 +1,5 @@
 """
-src/setup.py
+setup.py
 
 Python equivalent of Setup.bas's SetupVars/AvailChannel/RowCol.
 Resolves technician-assigned channel roles (Watts, FF BW 1, RSOC HI, etc.)
