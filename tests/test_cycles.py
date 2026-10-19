@@ -244,7 +244,7 @@ def test_duty_cycle_matches_hand_computed_value(channel_config, test_config):
     Timestamps are 1 min apart, so:
         on_duration = 50 min
         total_min   = 100 min   (no -1 min adjustment; matches the report's % Runtime)
-        duty_cycle  = 50 / 100
+        duty_cycle  = 50 / 99
     """
     raw_df = make_stats_raw_df()
     boundaries = make_three_cycle_boundaries(raw_df)
