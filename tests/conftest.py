@@ -22,7 +22,9 @@ def channel_map():
 
 @pytest.fixture
 def real_test_config():
-    return TestConfig(height_in=68.5, height_adjusted_in=78.5, ct=10.0,
+    # Data Sheet "Unit Height" for the 7272 run was 71 (technician input; the CSV header's
+    # CABINET_HEIGHT of 68.5 is not what the macro used). Macro adds 10" for t/c offset.
+    return TestConfig(height_in=71.0, height_adjusted_in=81.0, ct=10.0,
                       fz_only=False, fz_only_kfactor=1.0, adjusted_start=False)
 
 @pytest.fixture

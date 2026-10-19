@@ -11,9 +11,12 @@ from models import TestConfig
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_raw.csv"
 
 def test_stability_matches_original_macro_on_7272_file(alias_map, channel_map):
-    # alias_map and channel_map: the dicts from scratch_run.py, moved into conftest.py
-    # CABINET_HEIGHT in the file header is 68.5, +10" t/c offset
-    test_config = TestConfig(height_in=68.5, height_adjusted_in=78.5, ct=96.0,
+    """
+    alias_map and channel_map: the dicts from scratch_run.py, moved into conftest.py
+    Data Sheet "Unit Height" for the 7272 run was 71 (technician input; the CSV header's
+    CABINET_HEIGHT of 68.5 is not what the macro used). Macro adds 10" for t/c offset.
+    """
+    test_config = TestConfig(height_in=71.0, height_adjusted_in=81.0, ct=96.0,
                              fz_only=False, fz_only_kfactor=1.0, adjusted_start=False)
     imp = load_datacart_csv(FIXTURE, alias_map)
     config = build_channel_config(imp, channel_map)

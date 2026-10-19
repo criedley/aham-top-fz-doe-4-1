@@ -14,8 +14,8 @@ from checks import check_stability
 from channel_defaults import ALIAS_MAP, CHANNEL_MAP
 
 TEST_CONFIG = TestConfig(
-    height_in=68.5,
-    height_adjusted_in=78.5,
+    height_in=71.0,
+    height_adjusted_in=81.0,
     ct=10.0,
     fz_only=False,
     fz_only_kfactor=1.0,
