@@ -71,3 +71,23 @@ def test_csv_path_outside_data_dir_is_rejected(client):
     r = client.post("/submit", data=form_data("/etc/passwd"))
     assert r.status_code == 200
     assert "AHAM Report" not in r.text
+
+
+def test_upload_page_renders(client):
+    r = client.get("/")
+    assert r.status_code == 200
+    assert 'name="file"' in r.text
+
+
+def test_unreadable_file_shows_error_on_upload_page(client):
+    r = client.post("/configure",
+                    files={"file": ("bad.csv", b"not a data-cart file", "text/csv")})
+    assert r.status_code == 200
+    assert "Could not read file" in r.text
+
+
+def test_configure_form_has_hidden_path_and_default_selections(client):
+    r = client.post("/configure",
+                    files={"file": (FIXTURE.name, FIXTURE.read_bytes(), "text/csv")})
+    assert 'name="csv_path"' in r.text
+    assert 'value="Watts" selected' in r.text
