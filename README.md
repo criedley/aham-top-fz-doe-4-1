@@ -228,6 +228,14 @@ Where the port deliberately differs from the VBA. Each of these is intentional.
 - **Window midpoints in the cyclic stability check** use the last row of each
   window, where the VBA uses cycle on/off times. This changes the threshold
   slightly and is not yet matched.
+- **Defrost / Recovery boundary.** When a defrost-off event and the compressor-off
+  event fall seconds apart (7272: 17:55:14 and 17:55:16), the macro's import step keeps
+  the earlier timestamp and drops the later row. The port uses the later one, the actual
+  compressor-off. Defrost and Recovery durations differ from the macro by about 2 s.
+  Energy (Wh), EP2, T2 and ET are unaffected.
+- **Rounding.** The macro uses Excel's ROUND (ties round up). The port uses Python's
+  round, which can round an exact tie down. Displayed averages can differ from the
+  macro by 0.01 in those cases. No energy result is affected.
 
 ## Known limitations
 

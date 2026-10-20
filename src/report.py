@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
-from defrost import Segment
+from defrost import Segment, build_t2_table
 from models import ChannelConfig, TestConfig
 
 if TYPE_CHECKING:
@@ -55,6 +55,7 @@ class ReportData:
     gradient_ok: bool
     ice_ok: bool | None             # None when no ICE BW channel (macro prints "NA")
     t2_segments: dict[str, Segment]
+    t2_table: pd.DataFrame
     stable_cycle: int               # 0-based; highlight this row in the cycle table
     cycle_table: pd.DataFrame       # cycles printed in the macro's main table
 
@@ -154,6 +155,8 @@ def build_report(analysis: AnalysisResult, test_config: TestConfig) -> ReportDat
     ll, lh, rl, rh = gradient_maxes(cycles, height_ft)
 
     table = pre_defrost_cycles(cycles, defrost.segments["Defrost"].start)
+    t2_table = build_t2_table(raw_df, analysis.import_result.events_df, config, defrost, height_ft)
+
 
     return ReportData(
         test_duration_min=round(stab.test_duration_min, 1),
@@ -182,6 +185,7 @@ def build_report(analysis: AnalysisResult, test_config: TestConfig) -> ReportDat
         gradient_ok=gradient_ok(cycles, stab.stable_cycle, test_config.gradient_limit()),
         ice_ok=ice_ok(table, config),
         t2_segments=defrost.segments,
+        t2_table=t2_table,
         stable_cycle=stab.stable_cycle,
         cycle_table=table,
     )

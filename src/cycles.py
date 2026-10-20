@@ -212,6 +212,39 @@ def _find_stability_window(raw_df: pd.DataFrame, timestamps: pd.Series,
 # Shared per-cycle averaging (the "Run100NextLine" convergence point)
 # ---------------------------------------------------------------------------
 
+def window_stats(window: pd.DataFrame, config: ChannelConfig, height_ft: float) -> dict[str, float]:
+    """Channel averages (2 dp), volts min/max and gradients (3 dp) for one window of raw rows."""
+    def avg(col: str | None) -> float:
+        """Matches the VBA's 'If ch <> NA Then average Else 0' pattern."""
+        if col is None:
+            return 0.0
+        return round(float(window[col].mean()), 2)
+
+    if config.volts_col is not None:
+        volts = window[config.volts_col]
+        volts_avg = round(float(volts.mean()), 2)
+        volts_min = round(float(volts.min()), 2)
+        volts_max = round(float(volts.max()), 2)
+    else:
+        volts_avg = volts_min = volts_max = 0.0
+
+    rsoc_hi_avg, rsoc_lo_avg = avg(config.rsoc_hi_col), avg(config.rsoc_lo_col)
+    lsoc_hi_avg, lsoc_lo_avg = avg(config.lsoc_hi_col), avg(config.lsoc_lo_col)
+
+    return {
+        "ff_bw1": avg(config.ff_bw1_col), "ff_bw2": avg(config.ff_bw2_col), "ff_bw3": avg(config.ff_bw3_col),
+        "fz_bw1": avg(config.fz_bw1_col), "fz_bw2": avg(config.fz_bw2_col), "fz_bw3": avg(config.fz_bw3_col),
+        "fz_bw4": avg(config.fz_bw4_col), "fz_bw5": avg(config.fz_bw5_col),
+        "ice_bw": avg(config.ice_bw_col),
+        "volts_avg": volts_avg, "volts_min": volts_min, "volts_max": volts_max,
+        "rsoc_avg": avg(config.rsoc_col), "lsoc_avg": avg(config.lsoc_col),
+        "rsoc_hi_avg": rsoc_hi_avg, "rsoc_lo_avg": rsoc_lo_avg,
+        "lsoc_hi_avg": lsoc_hi_avg, "lsoc_lo_avg": lsoc_lo_avg,
+        "r_grad": abs(round((rsoc_hi_avg - rsoc_lo_avg) / height_ft, 3)),
+        "l_grad": abs(round((lsoc_hi_avg - lsoc_lo_avg) / height_ft, 3)),
+    }
+
+
 def _compute_cycle_stats(raw_df: pd.DataFrame, boundaries: CycleBoundaries,
                           config: ChannelConfig, test_config: TestConfig) -> pd.DataFrame:
     """
@@ -231,42 +264,12 @@ def _compute_cycle_stats(raw_df: pd.DataFrame, boundaries: CycleBoundaries,
     for i in range(n):
         start = boundaries.index_on[i]
         end = (boundaries.index_on[i + 1] - 1) if i + 1 < n else boundaries.last_scan_index
-        window = raw_df.iloc[start:end + 1]
+        stats = window_stats(raw_df.iloc[start:end + 1], config, height_ft)
 
-        def avg(col: str | None) -> float:
-            """Matches the VBA's 'If ch <> NA Then average Else 0' pattern."""
-            if col is None:
-                return 0.0
-            return round(float(window[col].mean()), 2)
-
-        ff_bw1, ff_bw2, ff_bw3 = avg(config.ff_bw1_col), avg(config.ff_bw2_col), avg(config.ff_bw3_col)
-        fz_bw1, fz_bw2, fz_bw3 = avg(config.fz_bw1_col), avg(config.fz_bw2_col), avg(config.fz_bw3_col)
-        fz_bw4, fz_bw5 = avg(config.fz_bw4_col), avg(config.fz_bw5_col)
-        ice_bw = avg(config.ice_bw_col)
-
-        if config.volts_col is not None:
-            volts_avg = round(float(window[config.volts_col].mean()), 2)
-            volts_min = round(float(window[config.volts_col].min()), 2)
-            volts_max = round(float(window[config.volts_col].max()), 2)
-        else:
-            volts_avg = volts_min = volts_max = 0.0
-
-        rsoc_avg, lsoc_avg = avg(config.rsoc_col), avg(config.lsoc_col)
-        rsoc_hi_avg, rsoc_lo_avg = avg(config.rsoc_hi_col), avg(config.rsoc_lo_col)
-        lsoc_hi_avg, lsoc_lo_avg = avg(config.lsoc_hi_col), avg(config.lsoc_lo_col)
-
-        r_grad = abs(round((rsoc_hi_avg - rsoc_lo_avg) / height_ft, 3))
-        l_grad = abs(round((lsoc_hi_avg - lsoc_lo_avg) / height_ft, 3))
-
-        # Duty cycle: on-duration / time to next cycle start (last cycle uses
-        # last_scan_time). Matches the macro report's "% Runtime". Setup.bas's
-        # Cycles-sheet formula subtracts 1 minute from the denominator, which
-        # gives values above 100% for cycles with almost no off time (e.g. 1.0158
-        # for cycle 21 in the 7272 file, which the report shows as 99.34%).
+        # Duty cycle: unchanged from your current code
         time_on_i = boundaries.time_on[i]
         time_off_i = boundaries.time_off[i]
         next_time_on = boundaries.time_on[i + 1] if i + 1 < n else boundaries.last_scan_time
-
         on_duration_min = (time_off_i - time_on_i).total_seconds() / 60
         total_min = (next_time_on - time_on_i).total_seconds() / 60
         duty_cycle = on_duration_min / total_min if total_min > 0 else float("nan")
@@ -279,14 +282,6 @@ def _compute_cycle_stats(raw_df: pd.DataFrame, boundaries: CycleBoundaries,
             "index_off": boundaries.index_off[i],
             "watt_hours_at_on": boundaries.watt_hours_at_on[i],
             "duty_cycle": duty_cycle,
-            "ff_bw1": ff_bw1, "ff_bw2": ff_bw2, "ff_bw3": ff_bw3,
-            "fz_bw1": fz_bw1, "fz_bw2": fz_bw2, "fz_bw3": fz_bw3,
-            "fz_bw4": fz_bw4, "fz_bw5": fz_bw5,
-            "ice_bw": ice_bw,
-            "volts_avg": volts_avg, "volts_min": volts_min, "volts_max": volts_max,
-            "rsoc_avg": rsoc_avg, "lsoc_avg": lsoc_avg,
-            "rsoc_hi_avg": rsoc_hi_avg, "rsoc_lo_avg": rsoc_lo_avg,
-            "lsoc_hi_avg": lsoc_hi_avg, "lsoc_lo_avg": lsoc_lo_avg,
-            "r_grad": r_grad, "l_grad": l_grad,
+            **stats,
         })
     return pd.DataFrame.from_records(records)

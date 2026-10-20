@@ -96,3 +96,21 @@ def test_matches_macro_on_7272_file(real_pipeline, real_test_config):
     assert r.t2_minutes == pytest.approx(303.5, abs=0.1)
     for name, wh in {"A": 92, "Precool": 78, "Defrost": 82, "Recovery": 194, "Post": 93}.items():
         assert r.segments[name].energy_wh == pytest.approx(wh, abs=1), name
+
+
+def test_no_retry_means_no_pre_or_post_cycles(channel_config):
+    r = run(channel_config)
+    assert r.pre_cycles == () and r.post_cycles == ()
+    assert r.defrost_start == _ts(240)
+
+
+def test_a_retry_exposes_the_skipped_cycle_as_a_pre_cycle(channel_config):
+    r = run(channel_config, bad_ranges=[(120, 180)])
+    assert [s.start for s in r.pre_cycles] == [_ts(120)]
+    assert r.segments["Precool"].start == _ts(180)
+
+
+def test_b_retry_exposes_the_failed_candidate_as_a_post_cycle(channel_config):
+    r = run(channel_config, bad_ranges=[(376, 436)])
+    assert [s.start for s in r.post_cycles] == [_ts(376)]
+    assert r.segments["Post"].start == _ts(316)

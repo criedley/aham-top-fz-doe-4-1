@@ -185,20 +185,60 @@
         {% endfor %}
     </table>
 
-    <h2>T2 Segments</h2>
+    <h2>T2 Data</h2>
     <table>
         <tr>
-            <th>Segment</th>
-            <th>Start</th>
-            <th>End</th>
-            <th>Wh</th>
+            <th>Cycle</th>
+            <th>FF BW 1</th>
+            <th>FF BW 2</th>
+            <th>FF BW 3</th>
+            <th>FZ BW 1</th>
+            <th>FZ BW 2</th>
+            <th>FZ BW 3</th>
+            <th>FZ BW 4</th>
+            <th>FZ BW 5</th>
+            <th>ICE BW</th>
+            <th>Volts Avg</th>
+            <th>Volts Min</th>
+            <th>Volts Max</th>
+            <th>LSOC Avg</th>
+            <th>RSOC Avg</th>
+            <th>Left Gradient</th>
+            <th>Right Gradient</th>
+            <th>Cycle Duration</th>
+            <th>On Time</th>
+            <th>Off Time</th>
+            <th>% Runtime</th>
+            <th>WHr</th>
+            <th>Start of Cycle</th>
+            <th>End of Cycle</th>
         </tr>
-        {% for seg in segment_rows %}
+        {% for row in t2_rows %}
         <tr>
-            <td>{{ seg.label }}</td>
-            <td>{{ seg.start.strftime("%m/%d/%y %H:%M:%S") }}</td>
-            <td>{{ seg.end.strftime("%m/%d/%y %H:%M:%S") }}</td>
-            <td>{{ "%.0f"|format(seg.wh) }}</td>
+            <td>{{ row.label }}</td>
+            <td>{{ row.ff_bw1 }}</td>
+            <td>{{ row.ff_bw2 }}</td>
+            <td>{{ row.ff_bw3 }}</td>
+            <td>{{ row.fz_bw1 }}</td>
+            <td>{{ row.fz_bw2 }}</td>
+            <td>{{ row.fz_bw3 }}</td>
+            <td>{{ row.fz_bw4 }}</td>
+            <td>{{ row.fz_bw5 }}</td>
+            <td>{{ row.ice_bw }}</td>
+            <td>{{ row.volts_avg }}</td>
+            <td>{{ row.volts_min }}</td>
+            <td>{{ row.volts_max }}</td>
+            <td>{{ row.lsoc_avg }}</td>
+            <td>{{ row.rsoc_avg }}</td>
+            <td>{{ row.l_grad }}</td>
+            <td>{{ row.r_grad }}</td>
+            <td>{{ "%.2f"|format(row.duration_min) }}</td>
+            <td>{{ "%.2f"|format(row.on_min) }}</td>
+            <td>{{ "%.2f"|format(row.off_min) }}</td>
+            <td>{{ "%.2f"|format(row.runtime * 100) }}%</td>
+            <td>{{ "%.0f"|format(row.wh) }}</td>
+            <td>{{ row.start.strftime("%m/%d/%y %H:%M") }}</td>
+            <td>{{ row.end.strftime("%m/%d/%y %H:%M") }}</td>
         </tr>
         {% endfor %}
     </table>

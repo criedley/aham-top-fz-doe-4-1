@@ -25,9 +25,6 @@ CONFIG_PATH = Path("config/channel_map.yaml")
 # AHAMCalc.bas: hght = <technician's Unit Height> + 10  ("10 in. adjustment for t/c offset")
 TC_OFFSET_IN = 10.0
 
-SEGMENT_LABELS = {"A": "A Cycle", "Precool": "Precool", "Defrost": "Defrost",
-                  "Recovery": "Recovery", "Post": "Post", "B": "B Cycle"}
-
 
 def _as_str(value: object) -> str | None:
     """Plain-text form fields should never be UploadFile objects."""
@@ -161,13 +158,9 @@ async def submit_form(request: Request):
         "test_config": asdict(test_config),
     }))
 
-    segment_rows = [
-        {"label": SEGMENT_LABELS[name], "start": seg.start, "end": seg.end, "wh": seg.energy_wh}
-        for name, seg in report.t2_segments.items()
-    ]
     return templates.TemplateResponse(request, "report.html", {
         "report": report,
         "cycle_rows": report.cycle_table.to_dict("records"),
-        "segment_rows": segment_rows,
+        "t2_rows": report.t2_table.to_dict("records"),
         "filename": csv_path.name,
     })
