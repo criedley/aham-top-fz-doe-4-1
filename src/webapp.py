@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from starlette.datastructures import FormData
 
-from channel_defaults import ALIAS_MAP
+from channel_defaults import ALIAS_MAP, CHANNEL_MAP
 from io_import import load_datacart_csv
 from main import run_analysis
 from models import TestConfig
@@ -32,6 +32,15 @@ SEGMENT_LABELS = {"A": "A Cycle", "Precool": "Precool", "Defrost": "Defrost",
 def _as_str(value: object) -> str | None:
     """Plain-text form fields should never be UploadFile objects."""
     return value if isinstance(value, str) else None
+
+
+# Optional roles the macro's Data Sheet maps when the channel exists.
+OPTIONAL_DEFAULTS = {"Volts": "Volts"}
+
+def _default_channels(columns: list[str]) -> dict[str, str]:
+    """Role -> column for every default that exists in the uploaded file."""
+    wanted = {**CHANNEL_MAP, **OPTIONAL_DEFAULTS}
+    return {role: col for role, col in wanted.items() if col in columns}
 
 
 def _form_float(form: FormData, name: str, label: str, default: float | None = None) -> float:
@@ -80,13 +89,18 @@ def _resolve_upload(raw: str | None) -> Path | None:
     return None
 
 
-def _technician_form(request: Request, csv_path: Path, error: str | None = None):
+def _technician_form(request: Request, csv_path: Path, error: str | None = None,
+                     selected: dict[str, str] | None = None,
+                     params: dict[str, str] | None = None):
     import_result = load_datacart_csv(csv_path, ALIAS_MAP)
+    columns = list(import_result.raw_df.columns)
     context: dict[str, object] = {
-        "columns": list(import_result.raw_df.columns),
+        "columns": columns,
         "required_roles": REQUIRED_ROLES,
         "optional_roles": OPTIONAL_ROLES,
         "csv_path": str(csv_path),
+        "selected": selected if selected is not None else _default_channels(columns),
+        "params": params or {},
     }
     if error:
         context["error"] = error
@@ -135,7 +149,10 @@ async def submit_form(request: Request):
         analysis = run_analysis(csv_path, channel_map, test_config)
         report = build_report(analysis, test_config)
     except (ValueError, ImportError, NotImplementedError) as e:
-        return _technician_form(request, csv_path, error=str(e))
+        params = {k: v for k in ("height_in", "ct", "fz_only_kfactor", "time_to_start")
+                  if (v := _as_str(form.get(k))) is not None}
+        return _technician_form(request, csv_path, error=str(e),
+                                selected=channel_map, params=params)
 
     CONFIG_PATH.parent.mkdir(exist_ok=True)
     CONFIG_PATH.write_text(yaml.dump({

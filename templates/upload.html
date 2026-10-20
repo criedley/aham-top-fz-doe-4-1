@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>AHAM Test Setup</title>
+</head>
+
+<body>
+    <h1>AHAM Test Setup</h1>
+    {% if error %}<p class="error" style="color:#b00020"><strong>{{ error }}</strong></p>{% endif %}
+    <form action="/configure" method="post" enctype="multipart/form-data">
+        <label>Raw data-cart CSV
+            <input type="file" name="file" accept=".csv" required>
+        </label>
+        <button type="submit">Upload</button>
+    </form>
+</body>
+
+</html>
