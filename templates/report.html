@@ -157,6 +157,7 @@
             <th>FZ BW1</th>
             <th>FZ BW2</th>
             <th>FZ BW3</th>
+            {% for key, label in report.optional_columns %}<th>{{ label }}</th>{% endfor %}
             <th>LSOC Avg</th>
             <th>RSOC Avg</th>
             <th>Left Grad</th>
@@ -174,6 +175,7 @@
             <td>{{ row.fz_bw1 }}</td>
             <td>{{ row.fz_bw2 }}</td>
             <td>{{ row.fz_bw3 }}</td>
+            {% for key, label in report.optional_columns %}<td>{{ row[key] }}</td>{% endfor %}
             <td>{{ row.lsoc_avg }}</td>
             <td>{{ row.rsoc_avg }}</td>
             <td>{{ row.l_grad }}</td>
@@ -189,18 +191,10 @@
     <table>
         <tr>
             <th>Cycle</th>
-            <th>FF BW 1</th>
-            <th>FF BW 2</th>
-            <th>FF BW 3</th>
             <th>FZ BW 1</th>
             <th>FZ BW 2</th>
             <th>FZ BW 3</th>
-            <th>FZ BW 4</th>
-            <th>FZ BW 5</th>
-            <th>ICE BW</th>
-            <th>Volts Avg</th>
-            <th>Volts Min</th>
-            <th>Volts Max</th>
+            {% for key, label in report.optional_columns %}<th>{{ label }}</th>{% endfor %}
             <th>LSOC Avg</th>
             <th>RSOC Avg</th>
             <th>Left Gradient</th>
@@ -216,18 +210,10 @@
         {% for row in t2_rows %}
         <tr>
             <td>{{ row.label }}</td>
-            <td>{{ row.ff_bw1 }}</td>
-            <td>{{ row.ff_bw2 }}</td>
-            <td>{{ row.ff_bw3 }}</td>
             <td>{{ row.fz_bw1 }}</td>
             <td>{{ row.fz_bw2 }}</td>
             <td>{{ row.fz_bw3 }}</td>
-            <td>{{ row.fz_bw4 }}</td>
-            <td>{{ row.fz_bw5 }}</td>
-            <td>{{ row.ice_bw }}</td>
-            <td>{{ row.volts_avg }}</td>
-            <td>{{ row.volts_min }}</td>
-            <td>{{ row.volts_max }}</td>
+            {% for key, label in report.optional_columns %}<td>{{ row[key] }}</td>{% endfor %}
             <td>{{ row.lsoc_avg }}</td>
             <td>{{ row.rsoc_avg }}</td>
             <td>{{ row.l_grad }}</td>

@@ -26,6 +26,22 @@ AMBIENT_HIGH_F = 91.05      # (88.95, 91.05), exclusive
 ICE_MAX_F = 32.0
 MAX_TABLE_CYCLES = 100      # AHAMSummary: "Limits number of cycles shown to 100"
 
+# (cycle-table key, header label, ChannelConfig attribute that must be set to show it)
+OPTIONAL_COLUMNS = [
+    ("fz_bw4", "FZ BW 4", "fz_bw4_col"),
+    ("fz_bw5", "FZ BW 5", "fz_bw5_col"),
+    ("ice_bw", "ICE BW", "ice_bw_col"),
+    ("volts_avg", "Volts Avg", "volts_col"),
+    ("volts_min", "Volts Min", "volts_col"),
+    ("volts_max", "Volts Max", "volts_col"),
+]
+
+
+def optional_columns(config: ChannelConfig) -> tuple[tuple[str, str], ...]:
+    """(key, label) for each optional column whose channel was assigned."""
+    return tuple((key, label) for key, label, attr in OPTIONAL_COLUMNS
+                 if getattr(config, attr) is not None)
+
 
 @dataclass(frozen=True)
 class ReportData:
@@ -58,6 +74,7 @@ class ReportData:
     t2_table: pd.DataFrame
     stable_cycle: int               # 0-based; highlight this row in the cycle table
     cycle_table: pd.DataFrame       # cycles printed in the macro's main table
+    optional_columns: tuple[tuple[str, str], ...]   # report columns for optional channels that were assigned
 
 
 def gradient_maxes(cycles: pd.DataFrame, height_ft: float) -> tuple[float, float, float, float]:
@@ -159,6 +176,7 @@ def build_report(analysis: AnalysisResult, test_config: TestConfig) -> ReportDat
 
 
     return ReportData(
+        optional_columns=optional_columns(config),
         test_duration_min=round(stab.test_duration_min, 1),
         test_duration_hr=round(stab.test_duration_min / 60, 1),
         energy_kwh_day=round(energy.et, 3),

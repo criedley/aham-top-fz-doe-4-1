@@ -6,7 +6,7 @@ import pytest
 
 from main import run_analysis
 from report import (ambient_ok, build_report, gradient_maxes, gradient_ok,
-                    ice_ok, pre_defrost_cycles)
+                    ice_ok, pre_defrost_cycles, optional_columns)
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_raw.csv"
 
@@ -122,3 +122,11 @@ def test_report_table_and_flags(report):
     assert report.cycle_table["cycle_num"].iloc[-1] == 21   # last cycle before the defrost
     assert report.ambient_ok and report.gradient_ok
     assert report.ice_ok is None                            # 7272 has no ICE channel
+
+
+def test_optional_columns_only_for_assigned_channels(channel_config):
+    assert optional_columns(channel_config) == ()       # fixture has all four unassigned
+    channel_config.volts_col = "Volts"
+    channel_config.fz_bw4_col = "FZ BW 4"
+    assert [k for k, _ in optional_columns(channel_config)] == [
+        "fz_bw4", "volts_avg", "volts_min", "volts_max"]

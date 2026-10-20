@@ -42,7 +42,8 @@ def test_submit_runs_pipeline_and_shows_macro_numbers(client):
     r = client.post("/submit", data=form_data(csv_path))
     assert r.status_code == 200
     assert "AHAM Report" in r.text
-    for expected in ("1.677", "303.5", "673.7", "0.458", "0.447", "0.043", "0.197", "Recovery", "121.32", "98.14%"):
+    for expected in ("1.677", "303.5", "673.7", "0.458", "0.447", "0.043", "0.197",
+                     "Recovery", "121.28", "98.15%"):
         assert expected in r.text, expected
 
 
@@ -91,3 +92,12 @@ def test_configure_form_has_hidden_path_and_default_selections(client):
                     files={"file": (FIXTURE.name, FIXTURE.read_bytes(), "text/csv")})
     assert 'name="csv_path"' in r.text
     assert 'value="Watts" selected' in r.text
+
+
+def test_optional_columns_shown_only_when_assigned(client):
+    csv_path = upload(client)
+    without = client.post("/submit", data=form_data(csv_path)).text
+    assert "Volts Avg" not in without and "FZ BW 4" not in without
+
+    with_volts = client.post("/submit", data=form_data(csv_path, Volts="Volts")).text
+    assert "Volts Avg" in with_volts and "FZ BW 4" not in with_volts

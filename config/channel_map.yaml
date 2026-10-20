@@ -16,7 +16,7 @@ channel_map:
   RSOC LO: RSOC LO
   RSOC Mid: RSOC Mid
   Unit On: Event 1 Unit On
-  Volts: Volts
+  Volts: NA
   Watt-Hours: Watt-Hours
   Watts: Watts
 csv_path: /Users/conner/development/ge_appliances/repos/aham-top-fz-doe-4-1/data/sample_raw.csv
