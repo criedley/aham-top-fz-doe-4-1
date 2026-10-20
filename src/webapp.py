@@ -1,121 +1,156 @@
 # src/webapp.py
-
+from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 import yaml
+from fastapi import FastAPI, Request, UploadFile
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from starlette.datastructures import FormData
 
+from channel_defaults import ALIAS_MAP
 from io_import import load_datacart_csv
-from setup import build_channel_config, REQUIRED_ROLES, OPTIONAL_ROLES
+from main import run_analysis
 from models import TestConfig
+from report import build_report
+from setup import OPTIONAL_ROLES, REQUIRED_ROLES
 
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent / "templates"))
 
 DATA_DIR = Path("data")
 CONFIG_PATH = Path("config/channel_map.yaml")
-ALIAS_MAP: dict[str, list[str]] = {}  # load your real channel_aliases.yaml here
+
+# AHAMCalc.bas: hght = <technician's Unit Height> + 10  ("10 in. adjustment for t/c offset")
+TC_OFFSET_IN = 10.0
+
+SEGMENT_LABELS = {"A": "A Cycle", "Precool": "Precool", "Defrost": "Defrost",
+                  "Recovery": "Recovery", "Post": "Post", "B": "B Cycle"}
+
 
 def _as_str(value: object) -> str | None:
-    """
-    Form fields we expect to be plain text (dropdowns, hidden inputs)
-    should never actually be UploadFile objects -- this narrows the type
-    for the type checker and guards against a malformed submission.
-    """
+    """Plain-text form fields should never be UploadFile objects."""
     return value if isinstance(value, str) else None
+
+
+def _form_float(form: FormData, name: str, label: str, default: float | None = None) -> float:
+    raw = _as_str(form.get(name))
+    if raw is None or raw.strip() == "":
+        if default is None:
+            raise ValueError(f"{label} is required")
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        raise ValueError(f"{label} must be a number, got '{raw}'") from None
+
+
+def _build_test_config(form: FormData) -> TestConfig:
+    height_in = _form_float(form, "height_in", "Unit height")
+    adjusted_start = form.get("adjusted_start") == "on"
+    time_to_start = None
+    if adjusted_start:
+        raw = _as_str(form.get("time_to_start"))
+        if not raw:
+            raise ValueError("A start time is required when 'Adjust Start Time' is checked")
+        try:
+            time_to_start = datetime.fromisoformat(raw)
+        except ValueError:
+            raise ValueError(f"Start time '{raw}' is not a valid date and time") from None
+
+    return TestConfig(
+        height_in=height_in,
+        height_adjusted_in=height_in + TC_OFFSET_IN,
+        ct=_form_float(form, "ct", "CT"),
+        fz_only=form.get("fz_only") == "on",
+        fz_only_kfactor=_form_float(form, "fz_only_kfactor", "K-factor", default=1.0),
+        adjusted_start=adjusted_start,
+        time_to_start=time_to_start,
+    )
+
+
+def _resolve_upload(raw: str | None) -> Path | None:
+    """Only accept files that live inside DATA_DIR."""
+    if not raw:
+        return None
+    path = Path(raw).resolve()
+    if path.is_file() and path.is_relative_to(DATA_DIR.resolve()):
+        return path
+    return None
+
+
+def _technician_form(request: Request, csv_path: Path, error: str | None = None):
+    import_result = load_datacart_csv(csv_path, ALIAS_MAP)
+    context: dict[str, object] = {
+        "columns": list(import_result.raw_df.columns),
+        "required_roles": REQUIRED_ROLES,
+        "optional_roles": OPTIONAL_ROLES,
+        "csv_path": str(csv_path),
+    }
+    if error:
+        context["error"] = error
+    return templates.TemplateResponse(request, "technician_form.html", context)
+
 
 @app.get("/", response_class=HTMLResponse)
 def show_upload_form(request: Request):
-    """Step 1: just ask for the CSV file, no columns to show yet."""
     return templates.TemplateResponse(request, "upload.html", {})
+
 
 @app.post("/configure", response_class=HTMLResponse)
 async def show_channel_form(request: Request, file: UploadFile):
-    """Step 2: file is uploaded, now show the channel-assignment form
-    populated with real columns from the actual uploaded file."""
     if not file.filename:
         return templates.TemplateResponse(request, "upload.html", {
             "error": "No file was selected. Please choose a CSV file to upload."
         })
 
     DATA_DIR.mkdir(exist_ok=True)
-    csv_path = DATA_DIR / file.filename
+    csv_path = DATA_DIR / Path(file.filename).name      # drop any directory components
     csv_path.write_bytes(await file.read())
 
     try:
-        import_result = load_datacart_csv(csv_path, ALIAS_MAP)
+        return _technician_form(request, csv_path)
     except Exception as e:
         return templates.TemplateResponse(
             request, "upload.html", {"error": f"Could not read file: {e}"}
         )
 
-    return templates.TemplateResponse(request, "technician_form.html", {
-        "columns": list(import_result.raw_df.columns),
-        "required_roles": REQUIRED_ROLES,
-        "optional_roles": OPTIONAL_ROLES,
-        "csv_path": str(csv_path),
-    })
 
 @app.post("/submit", response_class=HTMLResponse)
 async def submit_form(request: Request):
     form = await request.form()
 
-    raw_csv_path = form.get("csv_path")
-    if not isinstance(raw_csv_path, str) or not raw_csv_path:
+    csv_path = _resolve_upload(_as_str(form.get("csv_path")))
+    if csv_path is None:
         return templates.TemplateResponse(request, "upload.html", {
-            "error": "Missing or invalid file reference. Please start over."
-        })
-    csv_path = Path(raw_csv_path)
-    if not csv_path.exists():
-        return templates.TemplateResponse(request, "upload.html", {
-            "error": f"Uploaded file no longer found at {csv_path}. Please upload again."
+            "error": "Missing or invalid file reference. Please upload the file again."
         })
 
-    channel_map: dict[str, str] = {}
-    for role in REQUIRED_ROLES + OPTIONAL_ROLES:
-        value = _as_str(form.get(role))
-        if value is not None:
-            channel_map[role] = value
+    channel_map = {role: value for role in REQUIRED_ROLES + OPTIONAL_ROLES
+                   if (value := _as_str(form.get(role))) is not None}
 
     try:
-        import_result = load_datacart_csv(csv_path, ALIAS_MAP)
-        build_channel_config(import_result, channel_map)   # now receives a real dict[str, str]
-
-        test_config_fields = {
-            "height_in": float(_as_str(form.get("height_in")) or 0),
-            "ct": float(_as_str(form.get("ct")) or 0),
-            "fz_only": form.get("fz_only") == "on",
-            "fz_only_kfactor": float(_as_str(form.get("fz_only_kfactor")) or 1.0),
-            "adjusted_start": form.get("adjusted_start") == "on",
-            "time_to_start": _as_str(form.get("time_to_start")),
-        }
-        TestConfig(**test_config_fields)
-
-    except (ValueError, FileNotFoundError) as e:
-        import_result = load_datacart_csv(csv_path, ALIAS_MAP)
-        return templates.TemplateResponse(request, "technician_form.html", {
-            "columns": list(import_result.raw_df.columns),
-            "required_roles": REQUIRED_ROLES,
-            "optional_roles": OPTIONAL_ROLES,
-            "csv_path": str(csv_path),
-            "error": str(e),
-        })
+        test_config = _build_test_config(form)
+        analysis = run_analysis(csv_path, channel_map, test_config)
+        report = build_report(analysis, test_config)
+    except (ValueError, ImportError, NotImplementedError) as e:
+        return _technician_form(request, csv_path, error=str(e))
 
     CONFIG_PATH.parent.mkdir(exist_ok=True)
     CONFIG_PATH.write_text(yaml.dump({
         "csv_path": str(csv_path),
         "channel_map": channel_map,
-        "test_config": test_config_fields,
+        "test_config": asdict(test_config),
     }))
 
-    return RedirectResponse(url="/done", status_code=303)
-
-
-@app.get("/done", response_class=HTMLResponse)
-def done():
-    return """
-    <h2>Configuration saved.</h2>
-    <p>Run <code>python main.py</code> to process this test.</p>
-    """
+    segment_rows = [
+        {"label": SEGMENT_LABELS[name], "start": seg.start, "end": seg.end, "wh": seg.energy_wh}
+        for name, seg in report.t2_segments.items()
+    ]
+    return templates.TemplateResponse(request, "report.html", {
+        "report": report,
+        "cycle_rows": report.cycle_table.to_dict("records"),
+        "segment_rows": segment_rows,
+        "filename": csv_path.name,
+    })

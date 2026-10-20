@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>AHAM Report</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 1.5rem;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+        }
+
+        th,
+        td {
+            border: 1px solid #999;
+            padding: 2px 8px;
+            text-align: center;
+        }
+
+        th {
+            background: #1f4e79;
+            color: #fff;
+        }
+
+        td.label {
+            background: #1f4e79;
+            color: #fff;
+            font-weight: bold;
+            text-align: right;
+        }
+
+        tr.stable td {
+            outline: 2px solid #2e8b57;
+            background: #e8f5e9;
+        }
+
+        .bad {
+            background: #f4b6b6;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>AHAM Report</h1>
+    <p>{{ filename }}</p>
+
+    <table>
+        <tr>
+            <td class="label">Test Duration</td>
+            <td>{{ "%.1f"|format(report.test_duration_min) }} min ({{ "%.1f"|format(report.test_duration_hr) }} hrs)
+            </td>
+        </tr>
+        <tr>
+            <td class="label">Energy</td>
+            <td>{{ "%.3f"|format(report.energy_kwh_day) }} kWh/day</td>
+        </tr>
+        <tr>
+            <td class="label">EP1</td>
+            <td>{{ "%.3f"|format(report.ep1_kwh) }} kWh</td>
+        </tr>
+        <tr>
+            <td class="label">T1</td>
+            <td>{{ "%.1f"|format(report.t1_min) }} min</td>
+        </tr>
+        <tr>
+            <td class="label">T1 Period</td>
+            <td>{{ report.t1_start.strftime("%m/%d/%y %H:%M") }} to {{ report.t1_end.strftime("%m/%d/%y %H:%M") }}</td>
+        </tr>
+        <tr>
+            <td class="label">EP2</td>
+            <td>{{ "%.3f"|format(report.ep2_kwh) }} kWh</td>
+        </tr>
+        <tr>
+            <td class="label">T2</td>
+            <td>{{ "%.1f"|format(report.t2_min) }} min</td>
+        </tr>
+        <tr>
+            <td class="label">T2 Period</td>
+            <td>{{ report.t2_start.strftime("%m/%d/%y %H:%M") }} to {{ report.t2_end.strftime("%m/%d/%y %H:%M") }}</td>
+        </tr>
+        <tr>
+            <td class="label">FZ CT</td>
+            <td>{{ report.ct }}</td>
+        </tr>
+        <tr>
+            <td class="label">FF Avg</td>
+            <td>{% if report.ff_avg is none %}NA{% else %}{{ "%.2f"|format(report.ff_avg) }} &deg;F{% endif %}</td>
+        </tr>
+        <tr>
+            <td class="label">FZ Avg</td>
+            <td>{{ "%.2f"|format(report.fz_avg) }} &deg;F</td>
+        </tr>
+        <tr>
+            <td class="label">Ambient</td>
+            <td {% if not report.ambient_ok %}class="bad" {% endif %}>{{ "TRUE" if report.ambient_ok else "FALSE" }}
+            </td>
+        </tr>
+        <tr>
+            <td class="label">Gradient</td>
+            <td {% if not report.gradient_ok %}class="bad" {% endif %}>{{ "TRUE" if report.gradient_ok else "FALSE" }}
+            </td>
+        </tr>
+        <tr>
+            <td class="label">ICE BW</td>
+            <td {% if report.ice_ok is false %}class="bad" {% endif %}>{% if report.ice_ok is none %}NA{% else %}{{
+                "TRUE" if report.ice_ok else "FALSE" }}{% endif %}</td>
+        </tr>
+        <tr>
+            <td class="label">K factor</td>
+            <td>{{ report.k_factor }}</td>
+        </tr>
+        <tr>
+            <td class="label">Energy Corr.</td>
+            <td>{{ "%.3f"|format(report.energy_corr_kwh_day) }} kWh/day</td>
+        </tr>
+        <tr>
+            <td class="label">LSOC Avg</td>
+            <td>{{ "%.2f"|format(report.lsoc_avg) }} &deg;F</td>
+        </tr>
+        <tr>
+            <td class="label">RSOC Avg</td>
+            <td>{{ "%.2f"|format(report.rsoc_avg) }} &deg;F</td>
+        </tr>
+    </table>
+
+    <table>
+        <tr>
+            <td class="label">Left Gradient Lo-Mid</td>
+            <td>{{ "%.3f"|format(report.grad_left_lo_mid) }}</td>
+        </tr>
+        <tr>
+            <td class="label">Left Gradient Mid-Hi</td>
+            <td>{{ "%.3f"|format(report.grad_left_mid_hi) }}</td>
+        </tr>
+        <tr>
+            <td class="label">Right Gradient Lo-Mid</td>
+            <td>{{ "%.3f"|format(report.grad_right_lo_mid) }}</td>
+        </tr>
+        <tr>
+            <td class="label">Right Gradient Mid-Hi</td>
+            <td>{{ "%.3f"|format(report.grad_right_mid_hi) }}</td>
+        </tr>
+    </table>
+
+    <h2>Cycles</h2>
+    <table>
+        <tr>
+            <th>Cycle</th>
+            <th>FF BW1</th>
+            <th>FF BW2</th>
+            <th>FF BW3</th>
+            <th>FZ BW1</th>
+            <th>FZ BW2</th>
+            <th>FZ BW3</th>
+            <th>LSOC Avg</th>
+            <th>RSOC Avg</th>
+            <th>Left Grad</th>
+            <th>Right Grad</th>
+            <th>% Runtime</th>
+            <th>Start of Cycle</th>
+            <th>Compressor Off</th>
+        </tr>
+        {% for row in cycle_rows %}
+        <tr {% if row.cycle_num==report.stable_cycle + 1 %}class="stable" {% endif %}>
+            <td>{{ row.cycle_num }}{% if row.cycle_num == report.stable_cycle + 1 %} (stable){% endif %}</td>
+            <td>{{ row.ff_bw1 }}</td>
+            <td>{{ row.ff_bw2 }}</td>
+            <td>{{ row.ff_bw3 }}</td>
+            <td>{{ row.fz_bw1 }}</td>
+            <td>{{ row.fz_bw2 }}</td>
+            <td>{{ row.fz_bw3 }}</td>
+            <td>{{ row.lsoc_avg }}</td>
+            <td>{{ row.rsoc_avg }}</td>
+            <td>{{ row.l_grad }}</td>
+            <td>{{ row.r_grad }}</td>
+            <td>{{ "%.2f"|format(row.duty_cycle * 100) }}%</td>
+            <td>{{ row.time_on.strftime("%m/%d/%y %H:%M") }}</td>
+            <td>{{ row.time_off.strftime("%m/%d/%y %H:%M") }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h2>T2 Segments</h2>
+    <table>
+        <tr>
+            <th>Segment</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Wh</th>
+        </tr>
+        {% for seg in segment_rows %}
+        <tr>
+            <td>{{ seg.label }}</td>
+            <td>{{ seg.start.strftime("%m/%d/%y %H:%M:%S") }}</td>
+            <td>{{ seg.end.strftime("%m/%d/%y %H:%M:%S") }}</td>
+            <td>{{ "%.0f"|format(seg.wh) }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <p><a href="/">Analyze another file</a></p>
+</body>
+
+</html>

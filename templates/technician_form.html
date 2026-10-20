@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>AHAM Test Setup</title>
 </head>
+
 <body>
     <h1>Technician Input — Channel Assignment</h1>
+    {% if error %}<p class="error" style="color:#b00020"><strong>{{ error }}</strong></p>{% endif %}
     <form action="/submit" method="post">
 
         <h2>Required Channels</h2>
@@ -36,7 +39,8 @@
 
         <h2>Test Parameters</h2>
         <div>
-            <label for="height_in">Cabinet Height (inches)</label>
+            <label for="height_in">Unit Height (inches, as entered on the Data Sheet; 10 in. thermocouple offset is
+                added automatically)</label>
             <input type="number" step="0.1" name="height_in" id="height_in" required>
         </div>
         <div>
@@ -62,4 +66,5 @@
         <button type="submit">Save Configuration</button>
     </form>
 </body>
+
 </html>

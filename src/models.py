@@ -66,6 +66,8 @@ class TestConfig:
             )
         if self.ct <= 0:
             raise ValueError("CT value must be entered and greater than zero")  # replaces CheckUserInput
+        if self.height_in <= 0:
+            raise ValueError("Unit height must be greater than zero")
         if self.adjusted_start and self.time_to_start is None:
             raise ValueError("adjusted_start=True requires time_to_start to be set")
         if self.fz_only_kfactor not in (1.0, 0.85, 0.7):
